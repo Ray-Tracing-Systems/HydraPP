@@ -8,8 +8,6 @@
 #include <wchar.h>
 
 #include <math.h>
-#include "linmath.h"
-
 #if defined(WIN32)
 #include <FreeImage.h>
 #include <GLFW/glfw3.h>
@@ -20,7 +18,7 @@
 #include <GLFW/glfw3.h>
 #endif
 
-#include "mesh_utils.h"
+//#include "mesh_utils.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -30,8 +28,9 @@
 #include "HR_HDRImageTool.h"
 #include "HydraPostProcessAPI.h"
 #include "HydraXMLHelpers.h"
+#include "../HydraPostProcessAPI.h"
 
-using namespace TEST_UTILS;
+//using namespace TEST_UTILS;
 
 bool PP_TESTS::test301_resample()
 {
