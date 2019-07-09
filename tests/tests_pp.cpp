@@ -1,39 +1,85 @@
 #include "tests.h"
-#include <math.h>
 #include <iomanip>
+#include <cwchar>
+#include <cstdlib>
+#include <cstdio>
 #include <cstring>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <wchar.h>
-
-#include <math.h>
-#if defined(WIN32)
-#include <FreeImage.h>
-#include <GLFW/glfw3.h>
-#pragma comment(lib, "glfw3dll.lib")
-#pragma comment(lib, "FreeImage.lib")
-#else
-#include <FreeImage.h>
-#include <GLFW/glfw3.h>
-#endif
-
-//#include "mesh_utils.h"
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <sstream>
+#include <thread>
+#include <cmath>
 
+//#if defined(WIN32)
+//#include <FreeImage.h>
+//#pragma comment(lib, "FreeImage.lib")
+//#else
+//#include <FreeImage.h>
+//#endif
+
+#include "tests.h"
+#include "mesh_utils.h"
 #include "HR_HDRImageTool.h"
-#include "HydraPostProcessAPI.h"
+#include "../hydra_pp/HydraPostProcessAPI.h"
 #include "HydraXMLHelpers.h"
-#include "../HydraPostProcessAPI.h"
+#include "LiteMath.h"
 
-//using namespace TEST_UTILS;
+using namespace HydraLiteMath;
+using namespace pugi;
+
+float g_MSEOutput = 0.0f;
+
+bool check_images(const char* a_path, const int a_numImages = 1, const float a_mse = 50.0f)
+{
+  g_MSEOutput = 0.0f;
+  bool result = true;
+  for (int i = 0; i < a_numImages; i++)
+  {
+    std::string path1 = std::string("tests_images/") + std::string(a_path) + "/z_out";
+    std::string path2 = std::string("tests_images/") + std::string(a_path) + "/z_ref";
+    std::string path3 = std::string("tests_images/") + std::string(a_path) + "/w_ref";
+
+    if (i > 0)
+    {
+      std::stringstream strOut;
+      strOut << i + 1;
+
+      path1 += strOut.str();
+      path2 += strOut.str();
+      path3 += strOut.str();
+    }
+
+    path1 += ".png";
+    path2 += ".png";
+    path3 += ".png";
+
+    // use w_ref.png by default, if don't have such, use z_ref.png
+    //
+    path2 = path3;
+
+    int w1, h1, w2, h2;
+
+    std::vector<int32_t> image1, image2;
+    HydraRender::LoadLDRImageFromFile(path1.c_str(), &w1, &h1, image1);
+    HydraRender::LoadLDRImageFromFile(path2.c_str(), &w2, &h2, image2);
+
+    if (w1 != w2 || h1 != h2)
+    {
+      g_MSEOutput = 1000000.0f;
+      return false;
+    }
+
+    const float mseVal = HydraRender::MSE_RGB_LDR(image1, image2);
+    g_MSEOutput = fmax(g_MSEOutput, mseVal);
+
+    result = result && (mseVal <= a_mse);
+  }
+
+  return result;
+}
+
 
 bool PP_TESTS::test301_resample()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/texture1.bmp");
 
   int w, h;
@@ -52,6 +98,7 @@ bool PP_TESTS::test301_resample()
 
 bool PP_TESTS::test302_median()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/texture1_nosy.bmp");
 
   int w, h;
@@ -75,6 +122,7 @@ bool PP_TESTS::test302_median()
 
 bool PP_TESTS::test303_median_in_place()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/texture1_nosy.bmp");
 
   pugi::xml_document docSettings;
@@ -93,6 +141,7 @@ bool PP_TESTS::test303_median_in_place()
 
 bool PP_TESTS::test304_obsolete_tone_mapping()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/building.hdr");
 
   int w, h;
@@ -119,6 +168,7 @@ bool PP_TESTS::test304_obsolete_tone_mapping()
 
 bool PP_TESTS::test320_blur()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/texture1.bmp");
 
   int w, h;
@@ -143,6 +193,7 @@ bool PP_TESTS::test320_blur()
 
 bool PP_TESTS::test321_median_mostly_bad_pixels()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/texture1_nosy.bmp");
 
   int w, h;
@@ -168,6 +219,7 @@ bool PP_TESTS::test321_median_mostly_bad_pixels()
 
 bool PP_TESTS::test306_post_process_hydra1_exposure05()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -200,6 +252,7 @@ bool PP_TESTS::test306_post_process_hydra1_exposure05()
 
 bool PP_TESTS::test307_post_process_hydra1_exposure2()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -232,6 +285,7 @@ bool PP_TESTS::test307_post_process_hydra1_exposure2()
 
 bool PP_TESTS::test308_post_process_hydra1_compress()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -264,6 +318,7 @@ bool PP_TESTS::test308_post_process_hydra1_compress()
 
 bool PP_TESTS::test309_post_process_hydra1_contrast()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -296,6 +351,7 @@ bool PP_TESTS::test309_post_process_hydra1_contrast()
 
 bool PP_TESTS::test310_post_process_hydra1_desaturation()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -328,6 +384,7 @@ bool PP_TESTS::test310_post_process_hydra1_desaturation()
 
 bool PP_TESTS::test311_post_process_hydra1_saturation()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -360,6 +417,7 @@ bool PP_TESTS::test311_post_process_hydra1_saturation()
 
 bool PP_TESTS::test312_post_process_hydra1_whiteBalance()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -392,6 +450,7 @@ bool PP_TESTS::test312_post_process_hydra1_whiteBalance()
 
 bool PP_TESTS::test312_2_post_process_hydra1_whitePointColor()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -428,6 +487,7 @@ bool PP_TESTS::test312_2_post_process_hydra1_whitePointColor()
 
 bool PP_TESTS::test313_post_process_hydra1_uniformContrast()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -460,6 +520,7 @@ bool PP_TESTS::test313_post_process_hydra1_uniformContrast()
 
 bool PP_TESTS::test314_post_process_hydra1_normalize()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -492,6 +553,7 @@ bool PP_TESTS::test314_post_process_hydra1_normalize()
 
 bool PP_TESTS::test315_post_process_hydra1_vignette()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -524,6 +586,7 @@ bool PP_TESTS::test315_post_process_hydra1_vignette()
 
 bool PP_TESTS::test316_post_process_hydra1_chromAberr()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/wire01.hdr");
 
   int w, h;
@@ -556,6 +619,7 @@ bool PP_TESTS::test316_post_process_hydra1_chromAberr()
 
 bool PP_TESTS::test317_post_process_hydra1_sharpness()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -590,6 +654,7 @@ bool PP_TESTS::test317_post_process_hydra1_sharpness()
 
 bool PP_TESTS::test318_post_process_hydra1_ECCSWUNSVC()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/kitchen.hdr");
 
   int w, h;
@@ -624,6 +689,7 @@ bool PP_TESTS::test318_post_process_hydra1_ECCSWUNSVC()
 
 bool PP_TESTS::test319_post_process_hydra1_diffStars()
 {
+  hrSceneLibraryOpen(L"temp", HR_WRITE_DISCARD);
   HRFBIRef image1 = hrFBICreateFromFile(L"data/textures/10.hdr");
 
   int w, h;
@@ -664,7 +730,6 @@ bool PP_TESTS::test319_post_process_hydra1_diffStars()
   return check_images("test_319");
 }
 
-extern GLFWwindow* g_window;
 
 static inline int RealColorToUint32(const float real_color[4])
 {
@@ -673,10 +738,10 @@ static inline int RealColorToUint32(const float real_color[4])
   float  b = real_color[2] * 255.0f;
   float  a = real_color[3] * 255.0f;
 
-  unsigned char red   = (unsigned char)r;
-  unsigned char green = (unsigned char)g;
-  unsigned char blue  = (unsigned char)b;
-  unsigned char alpha = (unsigned char)a;
+  auto red   = (unsigned char)r;
+  auto green = (unsigned char)g;
+  auto blue  = (unsigned char)b;
+  auto alpha = (unsigned char)a;
 
   return red | (green << 8) | (blue << 16) | (alpha << 24);
 }
@@ -976,7 +1041,6 @@ bool PP_TESTS::test305_fbi_from_render()
     pList = pList->next;
   }
 
-  //hrRenderEnableDevice(renderRef, 0, true);
   hrRenderEnableDevice(renderRef, CURR_RENDER_DEVICE, true);
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1007,44 +1071,31 @@ bool PP_TESTS::test305_fbi_from_render()
   //
   HRSceneInstRef scnRef = hrSceneCreate(L"my scene");
 
-  static GLfloat	rtri = 25.0f; // Angle For The Triangle ( NEW )
-  static GLfloat	rquad = 40.0f;
-  static float    g_FPS = 60.0f;
-  static int      frameCounter = 0;
 
   const float DEG_TO_RAD = float(3.14159265358979323846f) / 180.0f;
 
-  float matrixT[4][4];
-  float mRot1[4][4], mTranslate[4][4], mRes[4][4];
-  //float mTranslateDown[4][4];
-
   hrSceneOpen(scnRef, HR_WRITE_DISCARD);
 
-  int mmIndex = 0;
-  mat4x4_identity(mRot1);
-  mat4x4_identity(mTranslate);
-  mat4x4_identity(mRes);
+  float4x4 mRot1;
+  float4x4 mTranslate;
+  float4x4 mScale;
+  float4x4 mRes;
 
-  mat4x4_translate(mTranslate, 0.0f, -0.70f*3.65f, 0.0f); 
-  mat4x4_scale(mRot1, mRot1, 3.65f);
-  mat4x4_mul(mRes, mTranslate, mRot1);
-  mat4x4_transpose(matrixT, mRes); // this fucking math library swap rows and columns
-  matrixT[3][3] = 1.0f;
+  mTranslate = translate4x4(make_float3(0.0f, -0.70f*3.65f, 0.0f));
+  mScale = scale4x4(make_float3(3.65f, 3.65f, 3.65f));
+  mRes = mul(mScale, mTranslate);
 
-  hrMeshInstance(scnRef, teapotRef, &matrixT[0][0]);
+  hrMeshInstance(scnRef, teapotRef, mRes.L());
 
-  mat4x4_identity(mRot1);
-  mat4x4_rotate_Y(mRot1, mRot1, 180.0f*DEG_TO_RAD);
-  //mat4x4_rotate_Y(mRot1, mRot1, rquad*DEG_TO_RAD);
-  mat4x4_transpose(matrixT, mRot1);
-  hrMeshInstance(scnRef, cubeOpenRef, &matrixT[0][0]);
+  mRot1 = rotate_Y_4x4(180.0f * DEG_TO_RAD);
+
+  hrMeshInstance(scnRef, cubeOpenRef, mRot1.L());
 
   /////////////////////////////////////////////////////////////////////// instance light (!!!)
 
-  mat4x4_identity(mTranslate);
-  mat4x4_translate(mTranslate, 0, 3.85f, 0);
-  mat4x4_transpose(matrixT, mTranslate);
-  hrLightInstance(scnRef, rectLight, &matrixT[0][0]);
+  mTranslate = translate4x4(make_float3(0.0f, 3.85f, 0.0f));
+
+  hrLightInstance(scnRef, rectLight, mTranslate.L());
 
   hrSceneClose(scnRef);
 

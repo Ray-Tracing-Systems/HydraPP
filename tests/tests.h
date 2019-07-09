@@ -30,4 +30,9 @@ namespace PP_TESTS
 
 };
 
+typedef bool(*TestFunc)();
+
+static bool g_testWasIgnored = false;
+static unsigned int CURR_RENDER_DEVICE = 0u;
+
 #endif //HYDRA_PP_TESTS_H
