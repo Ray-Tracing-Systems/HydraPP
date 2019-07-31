@@ -16,11 +16,13 @@
 //#endif
 
 #include "tests.h"
-#include "mesh_utils.h"
-#include "HR_HDRImageTool.h"
+#include "../../HydraAPI/hydra_api/HR_HDRImageTool.h"
+#include "../../HydraAPI/hydra_api/HydraXMLHelpers.h"
+#include "../../HydraAPI/hydra_api/LiteMath.h"
+
+#include "../../HydraAPI/utils/mesh_utils.h"
+
 #include "../hydra_pp/HydraPostProcessAPI.h"
-#include "HydraXMLHelpers.h"
-#include "LiteMath.h"
 
 using namespace HydraLiteMath;
 using namespace pugi;

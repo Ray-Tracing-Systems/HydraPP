@@ -1,8 +1,9 @@
 #include "HydraPostProcessAPI.h"
 #include "HydraPostProcessCommon.h"
 #include "HydraPostProcessSpecial.h"
-#include "HydraObjectManager.h"
-#include "HR_HDRImageTool.h"
+
+#include "../../HydraAPI/hydra_api/HydraObjectManager.h"
+#include "../../HydraAPI/hydra_api/HR_HDRImageTool.h"
 
 #include <fstream>
 #include <sstream>

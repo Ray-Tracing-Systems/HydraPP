@@ -1,18 +1,19 @@
 ﻿#pragma once
 
+#include <cstdint>
+#include <cstdlib>
+#include <ctime>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <cstdint>
-#include <stdlib.h>
-#include <ctime>
+
 #include <iomanip>
 #include <omp.h>
 #include <cmath>
-#include <math.h>
 
-#include "hydra_api/LiteMath.h"
+#include "../../HydraAPI/hydra_api/LiteMath.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

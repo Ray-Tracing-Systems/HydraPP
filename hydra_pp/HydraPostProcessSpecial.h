@@ -1,10 +1,9 @@
 #pragma once
 
 #include "HydraPostProcessAPI.h"
-#include "../hydra_api/HR_HDRImage.h"
-#include "../hydra_api/HR_HDRImageTool.h"
-
-#include "HydraRenderDriverAPI.h"
+#include "../../HydraAPI/hydra_api/HR_HDRImage.h"
+#include "../../HydraAPI/hydra_api/HR_HDRImageTool.h"
+#include "../../HydraAPI/hydra_api/HydraRenderDriverAPI.h"
 
 #include <unordered_map>
 #include <memory>

@@ -6,7 +6,7 @@
 #include <ctime>
 #include <functional>
 
-#include "LiteMath.h"
+#include "../../HydraAPI/hydra_api/LiteMath.h"
 #include <omp.h>
 
 #include "HydraPostProcessSpecial.h"

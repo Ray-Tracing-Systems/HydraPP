@@ -1,12 +1,17 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <HydraAPI.h>
 #include <csignal>
-#include <zconf.h>
 #include "tests.h"
+
+#include "../../HydraAPI/hydra_api/HydraAPI.h"
 #include "../hydra_pp/HydraPostProcessAPI.h"
 
+#ifndef WIN32
+  #include <zconf.h>
+#else
+  #include <windows.h>
+#endif
 
 extern float g_MSEOutput;
 
