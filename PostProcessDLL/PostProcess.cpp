@@ -430,52 +430,22 @@ void ExecutePostProcessHydra1(
     // ----- Compress -----
     if (a_compress > 0.0f && maxRgbSource > 1.01f)
     {
-      float4 rgbDataComp = image4out[i];
-
       float knee = 10.0f;
-      Blend(knee, 1.0f, pow(a_compress, 0.175f)); // lower = softer
+      Blend(knee, 2.0f, pow(a_compress, 0.175f)); // lower = softer
       const float antiKnee = 1.0f / knee;
-
-      // Small value "a_compress" start in RGB
-      if (a_compress < 1.0f)
-      {
-        rgbDataComp.x /= pow((1.0f + pow(rgbDataComp.x, knee)), antiKnee);
-        rgbDataComp.y /= pow((1.0f + pow(rgbDataComp.y, knee)), antiKnee);
-        rgbDataComp.z /= pow((1.0f + pow(rgbDataComp.z, knee)), antiKnee);
-      }
 
       ConvertSrgbToXyz(&image4out[i]);
       ConvertXyzToLmsPower(&image4out[i], 0.43f);
       ConvertLmsToIpt(&image4out[i]);
 
-      image4out[i].x = pow(image4out[i].x, 2.0f);
-      image4out[i].x /= (1.0f + image4out[i].x);
-      image4out[i].y *= (1.0f - image4out[i].x);
-      image4out[i].z *= (1.0f - image4out[i].x);
-      image4out[i].x = pow(image4out[i].x, 0.5f);
+      image4out[i].x /= pow((1.0f + pow(image4out[i].x, knee)), antiKnee);
+      const float multSat = 1.0f - pow(image4out[i].x, 4);
+      image4out[i].y *= multSat;
+      image4out[i].z *= multSat;
 
       ConvertIptToLms(&image4out[i]);
       ConvertLmsToXyzPower(&image4out[i]);
       ConvertXyzToSrgb(&image4out[i]);
-
-      // Return to main array
-      const float mix = 1.0f - a_compress;
-      Blend(image4out[i].x, rgbDataComp.x, mix);
-      Blend(image4out[i].y, rgbDataComp.y, mix);
-      Blend(image4out[i].z, rgbDataComp.z, mix);
-
-      // Addition little compress
-      //image4out[i].x = pow(image4out[i].x, 6.0f);
-      //image4out[i].y = pow(image4out[i].y, 6.0f);
-      //image4out[i].z = pow(image4out[i].z, 6.0f);
-
-      //image4out[i].x /= (1.0f + image4out[i].x);
-      //image4out[i].y /= (1.0f + image4out[i].y);
-      //image4out[i].z /= (1.0f + image4out[i].z);
-
-      //image4out[i].x = pow(image4out[i].x, 0.16666f);
-      //image4out[i].y = pow(image4out[i].y, 0.16666f);
-      //image4out[i].z = pow(image4out[i].z, 0.16666f);
     }
 
 

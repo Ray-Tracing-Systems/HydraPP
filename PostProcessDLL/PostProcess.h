@@ -29,6 +29,7 @@ float Luminance(const float3* data)
 {
   return (0.2126f * data->x + 0.7152f * data->y + 0.0722f * data->z);
 }
+
 float Luminance(const float4* data)
 {
   return (0.2126f * data->x + 0.7152f * data->y + 0.0722f * data->z);
@@ -73,7 +74,7 @@ void ConvertRgbToHsv(float4* data)
   float S = 0.0f;
   float V = rgb_max;
 
-  // Норм. значение 1
+  // normalize
   if (V != 0.0f)
   {
     r /= V;
@@ -88,7 +89,7 @@ void ConvertRgbToHsv(float4* data)
 
   if (S != 0.0f)
   {
-    // Насыщение 
+    // Saturation 
     r = (r - rgb_min) / S;
     g = (g - rgb_min) / S;
     b = (b - rgb_min) / S;
@@ -119,6 +120,7 @@ void ConvertRgbToHsv(float4* data)
   data->y = S;
   data->z = V;
 }
+
 void ConvertHsvToRgb(float4* data)
 {
   float h = data->x;
@@ -213,6 +215,7 @@ void ConvertRgbToXyz65(T* data)
   data->y = var_R * 0.2126729f + var_G * 0.7151522f + var_B * 0.0721750f;
   data->z = var_R * 0.0193339f + var_G * 0.1191920f + var_B * 0.9503041f;
 }
+
 void ConvertXyz65ToRgb(float4* data)
 {
   float var_X = data->x / 100.0f;  //X from 0 to  95.047      (Observer = 2°, Illuminant = D65)
@@ -247,6 +250,7 @@ void ConvertSrgbToXyz(float3* data)
   data->y = R * 0.2126729f + G * 0.7151522f + B * 0.0721750f;
   data->z = R * 0.0193339f + G * 0.1191920f + B * 0.9503041f;
 }
+
 void ConvertSrgbToXyz(float4* data)
 {
   const float R = data->x;
@@ -257,6 +261,7 @@ void ConvertSrgbToXyz(float4* data)
   data->y = R * 0.2126729f + G * 0.7151522f + B * 0.0721750f;
   data->z = R * 0.0193339f + G * 0.1191920f + B * 0.9503041f;
 }
+
 void ConvertXyzToSrgb(float4* data)
 {
   const float X = data->x;
@@ -285,6 +290,7 @@ void ConvertXyzToLab(float3* data)
   data->y = 500.0f * (var_X - var_Y); // CIE-a
   data->z = 200.0f * (var_Y - var_Z); // CIE-b
 }
+
 void ConvertXyzToLab(float4* data)
 {
   float var_X = data->x / 95.0470f;   //Observer= 2°, Illuminant= D65 
@@ -302,6 +308,7 @@ void ConvertXyzToLab(float4* data)
   data->y = 500.0f * (var_X - var_Y); // CIE-a
   data->z = 200.0f * (var_Y - var_Z); // CIE-b
 }
+
 void ConvertLabToXyz(float4* data)
 {
   float var_Y = (data->x + 16.0f) / 116.0f;
@@ -326,7 +333,7 @@ void ConvertLabToXyz(float4* data)
 
 void MatrixCat02(float3* data)
 {
-  // Преобразование в колбочковые ответы. Mcat02 in CAM02. 
+  // conversion into cones. Mcat02 in CAM02. 
   const float R = 0.7328f * data->x + 0.4296f * data->y + -0.1624f * data->z;
   const float G = -0.7036f * data->x + 1.6975f * data->y + 0.0061f * data->z;
   const float B = 0.0030f * data->x + 0.0136f * data->y + 0.9834f * data->z;
@@ -337,7 +344,7 @@ void MatrixCat02(float3* data)
 }
 void MatrixCat02(float4* data)
 {
-  // Преобразование в колбочковые ответы. Mcat02 in CAM02. 
+  // conversion into cones. Mcat02 in CAM02. 
 
   const float R = 0.7328f * data->x + 0.4296f * data->y + -0.1624f * data->z;
   const float G = -0.7036f * data->x + 1.6975f * data->y + 0.0061f * data->z;
@@ -347,6 +354,7 @@ void MatrixCat02(float4* data)
   data->y = G;
   data->z = B;
 }
+
 template <typename T>
 void InverseMatrixCat02(T* data)
 {
@@ -363,7 +371,7 @@ void InverseMatrixCat02(T* data)
 template <typename T>
 void MatrixHpe(T* data)
 {
-  // конверт в колбочки. Matrix HPE in CAM02. (Hunt-Pointer-Estevez)
+  // conversion into cones. Matrix HPE in CAM02. (Hunt-Pointer-Estevez)
   const float L = 0.38971f * data->x + 0.68898f * data->y + -0.07868f * data->z; //Kuo modify −0.07869
   const float M = -0.22981f * data->x + 1.18340f * data->y + 0.04641f * data->z; //            0.04642f ?
   const float S = data->z;
@@ -433,6 +441,7 @@ void ConvertXyzToLmsPower(float4 * data, const float power)
   data->y = M;
   data->z = S;
 }
+
 void ConvertLmsToXyzPower(float4* data)
 {
   float L = data->x;
@@ -463,6 +472,7 @@ void ConvertLmsToIpt(float4* data)
   data->y = P;
   data->z = T;
 }
+
 void ConvertIptToLms(float4* data)
 {
   const float L = 0.9999f * data->x + 0.0970f * data->y + 0.2053f * data->z;
@@ -499,23 +509,24 @@ void Blend(float& inData1, const float& inData2, const float coeff) // 0 - data1
 {
   inData1 = inData1 + (inData2 - inData1) * coeff;
 }
+
 template <typename T>
 void Normalize(T& data, const float inMin, const float inMax, const float outMin, const float outMax)
 {
-  // Формула нормализации y = (inCurrent - inMin) * (outMax - outMin) / (inMax - inMin) + outMin
-  // inCurrent - значение, подлежащее нормализации
-  // [Xmin, Xmax] - интервал значений х
-  // [outMin, outMax] - Интервал, к которому будет приведено значение x
+  // Normalize y = (inCurrent - inMin) * (outMax - outMin) / (inMax - inMin) + outMin
+  // inCurrent - value to be normalized
+  // [Xmin, Xmax] - the interval of x values
+  // [outMin, outMax] - Interval, which is given the value of x.
   data = (data - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 void OffsetCenter(float& data, const float inMin, const float inMax, const float coef)
 {
-  // Ф-ция смещения центра диапазона на coef
-  Normalize(data, inMin, inMax, 0, 1);  // Нормализуем в 0 - 1
+  // function to shift the center of the range by a coef.
+  Normalize(data, inMin, inMax, 0, 1); 
 
   data = pow(data, coef);
 
-  Normalize(data, 0, 1, inMin, inMax);  // Нормализуем обратно
+  Normalize(data, 0, 1, inMin, inMax);  
 }
 void ContrastField(float& data)
 {
@@ -529,40 +540,7 @@ void Compress(float& data, const float maxRgb)
 {
   data = (data * (1.0f + data / (maxRgb * maxRgb))) / (1.0f + data);
 }
-void CompressHsv(float4* hsvData)
-{
-  // Сжимаем яркость 
-  hsvData->z = hsvData->z / (1.0f + hsvData->z);
 
-
-  // Смещение тона по аддитивному закону в зависимости от яркости.
-  float coefOffsetHue = 1.0f - pow(hsvData->z, 10.0f);
-  //coefOffsetHue = 1.0f; // turned off
-
-  // От красного (360) до пурпурного (300) сжимаются к пурпурному.
-  if (hsvData->x < 360 && hsvData->x >= 300)
-    OffsetCenter(hsvData->x, 360, 300, coefOffsetHue);
-
-  // От пурпурного (300) до синего (240) сжимаются к пурпурному.
-  else if (hsvData->x < 300 && hsvData->x >= 240)
-    OffsetCenter(hsvData->x, 240, 300, coefOffsetHue);
-
-  // От синего (240) до бирюзового (180) сжимаются к бирюзовому
-  else if (hsvData->x < 240 && hsvData->x >= 180)
-    OffsetCenter(hsvData->x, 240, 180, coefOffsetHue);
-
-  // От бирюзового (180) до зелёного (120) сжимаются к бирюзовому
-  else if (hsvData->x < 180 && hsvData->x >= 120)
-    OffsetCenter(hsvData->x, 120, 180, coefOffsetHue);
-
-  // От зелёного (120) до жёлтого (60) сжимаются к жёлтому.
-  else if (hsvData->x < 120 && hsvData->x >= 60)
-    OffsetCenter(hsvData->x, 120, 60, coefOffsetHue);
-
-  // От красного (0) до жёлтого (60) сжимаются к жёлтому
-  else if (hsvData->x < 60 && hsvData->x >= 0)
-    OffsetCenter(hsvData->x, 0, 60, coefOffsetHue);
-}
 void CalculateHistogram(const float& data, float histogram[], const int histogramBin, const float iterrHistogramBin)
 {
   if (data <= 1.0f)
@@ -615,26 +593,22 @@ void UniformContrastRgb(float* data, const int sizeImage, const int histogramBin
 
   std::vector<float> histogram(histogramBin);
 
-  // --- Cчитаем гистограмму ---
+  // --- Calculate histogram ---
   //#pragma omp parallel for
   for (int i = 0; i < sizeImage * 3; i++)
   {
     if (data[i] <= 1.0f)
-    {
-      // Текущая корзина.      
+    {      
       const int currentHistogramBin = (int)round(data[i] * float(histogramBin - 1));
-
-      // Увеличиваем счётчик текущей корзины.
+           
       if (currentHistogramBin >= 0 && currentHistogramBin < histogramBin)
         histogram[currentHistogramBin] += iterrHistogramBin;
     }
   }
 
-  // Пересчитываем гистограмму (перераспределение)
   for (int i = 1; i < histogramBin; i++)
     histogram[i] = histogram[i - 1] + histogram[i];
 
-  // // Находим мин и макс значение гистограммы
   //#pragma omp parallel for
   for (int i = 0; i < histogramBin; i++)
   {
@@ -645,12 +619,10 @@ void UniformContrastRgb(float* data, const int sizeImage, const int histogramBin
       histMax = histogram[i];
   }
 
-  // Нормализуем гистограмму к 0 - 1 и выводим
   #pragma omp parallel for
   for (int i = 0; i < histogramBin; i++)
     Normalize(histogram[i], histMin, histMax, 0.0f, 1.0f);
 
-  // Присваиваем гистограмму яркости.
   #pragma omp parallel for
   for (int i = 0; i < sizeImage * 3; i++)
   {
@@ -689,25 +661,20 @@ void UniformContrastField0(float4* data, const int sizeImage, const int histogra
 
   std::vector<float> histogram(histogramBin);
 
-  // --- Cчитаем гистограмму ---
   //#pragma omp parallel for
   for (int i = 0; i < sizeImage; i++)
   {
     data[i].x = data[i].x / (1.0f + data[i].x);
 
-    // Текущая корзина.      
     const int currentHistogramBin = (int)round(data[i].x * float(histogramBin - 1));
 
-    // Увеличиваем счётчик текущей корзины.
     if (currentHistogramBin >= 0 && currentHistogramBin < histogram.size())
       histogram[currentHistogramBin] += iterrHistogramBin;
   }
 
-  // Пересчитываем гистограмму (перераспределение)
   for (int i = 1; i < histogramBin; i++)
     histogram[i] = histogram[i - 1] + histogram[i];
 
-  // Находим мин и макс значение гистограммы
   #pragma omp parallel for
   for (int i = 0; i < histogramBin; i++)
   {
@@ -718,12 +685,10 @@ void UniformContrastField0(float4* data, const int sizeImage, const int histogra
       histMax = histogram[i];
   }
 
-  // Нормализуем гистограмму к 0 - 1 и выводим
   #pragma omp parallel for
   for (int i = 0; i < histogramBin; i++)
     Normalize(histogram[i], histMin, histMax, 0.0f, 1.0f);
 
-  // Присваиваем гистограмму яркости.
   #pragma omp parallel for
   for (int i = 0; i < sizeImage; i++)
   {
@@ -863,8 +828,8 @@ void SummValueOnField(const float4 data[], float3* summRgb, const int i)
 }
 void ChrommAberr(const float4 inData[], float outData1[], float outData2[], const int m_width, const int m_height, const int sizeImage, const float a_chromAberr, const int x, const int y, const int i)
 {
-  // Генерируем карту велосити.
-  // (-1, -1) - влево вниз, (0, 0) - нет движения. (1, 1) - вправо вверх.  Красный > зелёный > синий.
+  // Generate velocity map.
+  // (-1, -1) - left bottom, (0, 0) - not move. (1, 1) - right top.  Red > green > blue.
   const float stepVelocityX = (float)x / m_width;
   const float stepVelocityY = (float)y / m_height;
   const float velocityX = stepVelocityX * 2.0f - 1.0f; // -1.0f to 1.0f
@@ -1060,16 +1025,14 @@ void Resize(float inData[], const float sourceWidth, const float sourceHeight, c
       for (int x = 0; x < newWidth; ++x)
       {
         const int i = (y * newWidth) + x;
-        const int j = FloatToInt((y / resize * 0.99f) * newWidth + x / resize);
+        const int j = FloatToInt((y / resize ) * newWidth + x / resize);
         resizeArray[i] = inData[j];
       }
     }
 
 
     for (int i = 0; i < newSizeImage; ++i)
-    {
       inData[i] = resizeArray[i];
-    }
 
     free(resizeArray);
     resizeArray = NULL;
