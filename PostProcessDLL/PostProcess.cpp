@@ -430,6 +430,7 @@ void ExecutePostProcessHydra1(
     // ----- Compress -----
     if (a_compress > 0.0f && maxRgbSource > 1.01f)
     {
+      //Global LMS/IPT compress.
       float knee = 10.0f;
       Blend(knee, 2.0f, pow(a_compress, 0.175f)); // lower = softer
       const float antiKnee = 1.0f / knee;
@@ -438,8 +439,9 @@ void ExecutePostProcessHydra1(
       ConvertXyzToLmsPower(&image4out[i], 0.43f);
       ConvertLmsToIpt(&image4out[i]);
 
-      image4out[i].x /= pow((1.0f + pow(image4out[i].x, knee)), antiKnee);
-      const float multSat = 1.0f - pow(image4out[i].x, 4);
+      const float compLum = image4out[i].x / pow((1.0f + pow(image4out[i].x, knee)), antiKnee);
+      const float multSat = pow(compLum / image4out[i].x, 1.5f);
+      image4out[i].x = compLum;
       image4out[i].y *= multSat;
       image4out[i].z *= multSat;
 
