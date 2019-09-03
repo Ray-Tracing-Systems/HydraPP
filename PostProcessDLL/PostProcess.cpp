@@ -303,7 +303,7 @@ void ExecutePostProcessHydra1(
     {
       const unsigned int i = y * a_width + x;
 
-      image4out[i] = image4in[i];  //uncomment in 3dmax plugin
+      image4out[i] = image4in[i];  
 
       // ----- Sharpness -----
       if (a_sharpness > 0.0f)
@@ -494,84 +494,14 @@ void ExecutePostProcessHydra1(
   // ----- Uniform contrast. Loop 3 and 4. -----
   if (a_uniformContrast > 0.0f)
   {
-    std::vector<float> rgbArray(sizeImage * 3);
-
-    // Convert 3 field RGB to linear array.
-    #pragma omp parallel for
-    for (int i = 0; i < sizeImage; ++i)
-    {
-      rgbArray[i] = image4out[i].x;
-      rgbArray[sizeImage + i] = image4out[i].y;
-      rgbArray[sizeImage * 2 + i] = image4out[i].z;
-    }
-
-    UniformContrastRgb(&rgbArray[0], sizeImage, histogramBin);
-
-    // Return to main array
-    #pragma omp parallel for
-    for (int i = 0; i < sizeImage; ++i)
-    {
-      const float meanRGBsource = (image4out[i].x + image4out[i].y + image4out[i].z) / 3.0f;
-      const float meanRGB_UC = (rgbArray[i] + rgbArray[i + sizeImage] + rgbArray[i + sizeImage * 2]) / 3.0f;
-
-      float diff = meanRGB_UC / (meanRGBsource + 0.0001f);
-      float3 rgbDiff;
-      rgbDiff.x = image4out[i].x;
-      rgbDiff.y = image4out[i].y;
-      rgbDiff.z = image4out[i].z;
-
-      Blend(rgbDiff.x, image4out[i].x * diff, a_uniformContrast);
-      Blend(rgbDiff.y, image4out[i].y * diff, a_uniformContrast);
-      Blend(rgbDiff.z, image4out[i].z * diff, a_uniformContrast);
-
-      Blend(image4out[i].x, rgbArray[i], a_uniformContrast);
-      Blend(image4out[i].y, rgbArray[i + sizeImage], a_uniformContrast);
-      Blend(image4out[i].z, rgbArray[i + sizeImage * 2], a_uniformContrast);
-
-      Blend(image4out[i].x, rgbDiff.x, 0.5f);
-      Blend(image4out[i].y, rgbDiff.y, 0.5f);
-      Blend(image4out[i].z, rgbDiff.z, 0.5f);
-    }
+    UniformContrastRGBFilter(&image4out[0], sizeImage, histogramBin, a_uniformContrast);
   }
 
   // ----- Calculate histogram for normalize. Loop 5 and 6. -----
   if (a_normalize > 0.0f)
-  {
-    #pragma omp parallel for
-    for (int i = 0; i < sizeImage; ++i)
-    {
-      CalculateHistogram(image4out[i].x, &histogram[0].x, histogramBin, iterrHistogramBin);
-      CalculateHistogram(image4out[i].y, &histogram[0].y, histogramBin, iterrHistogramBin);
-      CalculateHistogram(image4out[i].z, &histogram[0].z, histogramBin, iterrHistogramBin);
-    }
+    NormalizeFilter(&image4out[0], &histogram[0], sizeImage, histogramBin, minHistBin, maxHistBin, minAllHistBin, maxAllHistBin, a_normalize);
 
-    // Calculate min/max histogram for a_normalize
-    MinMaxHistBin(&histogram[0].x, minHistBin.x, maxHistBin.x, sizeImage, histogramBin);
-    MinMaxHistBin(&histogram[0].y, minHistBin.y, maxHistBin.y, sizeImage, histogramBin);
-    MinMaxHistBin(&histogram[0].z, minHistBin.z, maxHistBin.z, sizeImage, histogramBin);
 
-    minAllHistBin = Min3(minHistBin.x, minHistBin.y, minHistBin.z);
-    maxAllHistBin = Max3(maxHistBin.x, maxHistBin.y, maxHistBin.z);
-
-    // Normalize 
-    #pragma omp parallel for
-    for (int i = 0; i < sizeImage; ++i)
-    {
-      float3 dataNorm;
-      dataNorm.x = image4out[i].x;
-      dataNorm.y = image4out[i].y;
-      dataNorm.z = image4out[i].z;
-
-      Normalize(dataNorm.x, minAllHistBin, maxAllHistBin, 0.0f, 1.0f);
-      Normalize(dataNorm.y, minAllHistBin, maxAllHistBin, 0.0f, 1.0f);
-      Normalize(dataNorm.z, minAllHistBin, maxAllHistBin, 0.0f, 1.0f);
-
-      Blend(image4out[i].x, dataNorm.x, a_normalize);
-      Blend(image4out[i].y, dataNorm.y, a_normalize);
-      Blend(image4out[i].z, dataNorm.z, a_normalize);
-    }
-  }
-    
   //********************* End filters *********************
 
   if (a_chromAberr > 0.0f)

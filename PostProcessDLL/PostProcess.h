@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <omp.h>
 #include <cmath>
+#include <algorithm> 
 
 #include "../../HydraAPI/hydra_api/LiteMath.h"
 
@@ -20,21 +21,18 @@
 using HydraLiteMath::float3;
 using HydraLiteMath::float4;
 
-int FloatToInt(const float inData)
-{
-  return int(inData + 0.5f);
-}
-
 float Luminance(const float3* data)
 {
   return (0.2126f * data->x + 0.7152f * data->y + 0.0722f * data->z);
 }
-
 float Luminance(const float4* data)
 {
   return (0.2126f * data->x + 0.7152f * data->y + 0.0722f * data->z);
 }
-
+float Mean(const float4 * data)
+{
+  return (data->x + data->y + data->z) / 3.0f;
+}
 void SpectralToRGB(float &r, float &g, float &b, const float l) // RGB <0,1> <- lambda l <400,700> [nm]
 {
   float t;
@@ -53,11 +51,10 @@ void SpectralToRGB(float &r, float &g, float &b, const float l) // RGB <0,1> <- 
   if ((l >= 400.0f) && (l < 475.0f)) { t = (l - 400.0f) / (475.0f - 400.0f); b = +(2.20f * t) - (1.50f * t * t); }
   else if ((l >= 475.0f) && (l < 560.0f)) { t = (l - 475.0f) / (560.0f - 475.0f); b = 0.7f - (t)+(0.30f * t * t); }
 }
-
 void ConvertRgbToHsv(float4* data)
 {
-  #define MIN3(x,y,z)  ((y) <= (z) ? ((x) <= (y) ? (x) : (y)) : ((x) <= (z) ? (x) : (z)))
-  #define MAX3(x,y,z)  ((y) >= (z) ? ((x) >= (y) ? (x) : (y)) : ((x) >= (z) ? (x) : (z)))
+#define MIN3(x,y,z)  ((y) <= (z) ? ((x) <= (y) ? (x) : (y)) : ((x) <= (z) ? (x) : (z)))
+#define MAX3(x,y,z)  ((y) >= (z) ? ((x) >= (y) ? (x) : (y)) : ((x) >= (z) ? (x) : (z)))
 
   float r = data->x;
   float g = data->y;
@@ -74,7 +71,7 @@ void ConvertRgbToHsv(float4* data)
   float S = 0.0f;
   float V = rgb_max;
 
-  // normalize
+  // Норм. значение 1
   if (V != 0.0f)
   {
     r /= V;
@@ -89,7 +86,7 @@ void ConvertRgbToHsv(float4* data)
 
   if (S != 0.0f)
   {
-    // Saturation 
+    // Насыщение 
     r = (r - rgb_min) / S;
     g = (g - rgb_min) / S;
     b = (b - rgb_min) / S;
@@ -98,16 +95,13 @@ void ConvertRgbToHsv(float4* data)
   rgb_min = MIN3(r, g, b);
   rgb_max = MAX3(r, g, b);
 
-  if (rgb_max == r)
-  {
+  if (rgb_max == r) {
     H = 0.0f + 60.0f*(g - b);
   }
-  else if (rgb_max == g)
-  {
+  else if (rgb_max == g) {
     H = 120.0f + 60.0f*(b - r);
   }
-  else /* rgb_max == *b */
-  {
+  else /* rgb_max == *b */ {
     H = 240.0f + 60.0f*(r - g);
   }
 
@@ -120,7 +114,186 @@ void ConvertRgbToHsv(float4* data)
   data->y = S;
   data->z = V;
 }
+void ConvertRgbToXyz65(float4* data)
+{
+  float var_R = data->x; //var_R from 0 to 1
+  float var_G = data->y; //var_G from 0 to 1
+  float var_B = data->z; //var_B from 0 to 1
 
+  if (var_R > 0.04045f) var_R = pow((var_R + 0.055f) / 1.055f, 2.4f);
+  else                  var_R = var_R / 12.92f;
+
+  if (var_G > 0.04045f) var_G = pow((var_G + 0.055f) / 1.055f, 2.4f);
+  else                  var_G = var_G / 12.92f;
+
+  if (var_B > 0.04045f) var_B = pow((var_B + 0.055f) / 1.055f, 2.4f);
+  else                  var_B = var_B / 12.92f;
+
+  var_R *= 100.0f;
+  var_G *= 100.0f;
+  var_B *= 100.0f;
+
+  //Chromatic adaptation. Observer. = 2°, Illuminant = D65
+
+  data->x = var_R * 0.4124564f + var_G * 0.3575761f + var_B * 0.1804375f;
+  data->y = var_R * 0.2126729f + var_G * 0.7151522f + var_B * 0.0721750f;
+  data->z = var_R * 0.0193339f + var_G * 0.1191920f + var_B * 0.9503041f;
+}
+void ConvertSrgbToXyz(float3* data)
+{
+  const float R = data->x;
+  const float G = data->y;
+  const float B = data->z;
+
+  data->x = R * 0.4124564f + G * 0.3575761f + B * 0.1804375f;
+  data->y = R * 0.2126729f + G * 0.7151522f + B * 0.0721750f;
+  data->z = R * 0.0193339f + G * 0.1191920f + B * 0.9503041f;
+}
+void ConvertSrgbToXyz(float4* data)
+{
+  const float R = data->x;
+  const float G = data->y;
+  const float B = data->z;
+
+  data->x = R * 0.4124564f + G * 0.3575761f + B * 0.1804375f;
+  data->y = R * 0.2126729f + G * 0.7151522f + B * 0.0721750f;
+  data->z = R * 0.0193339f + G * 0.1191920f + B * 0.9503041f;
+}
+void ConvertSrgbToXyzIcam06(float4* data)
+{
+  const float R = data->x;
+  const float G = data->y;
+  const float B = data->z;
+
+  data->x = R * 0.412424f + G * 0.2126560f + B * 0.0193324f;
+  data->y = R * 0.357579f + G * 0.7151580f + B * 0.1191900f;
+  data->z = R * 0.180464f + G * 0.0721856f + B * 0.9504440f;
+}
+void ConvertXyz65ToRgb(float4* data)
+{
+  float var_X = data->x / 100.0f;  //X from 0 to  95.047      (Observer = 2°, Illuminant = D65)
+  float var_Y = data->y / 100.0f;  //Y from 0 to 100.000
+  float var_Z = data->z / 100.0f;  //Z from 0 to 108.883
+
+                                   //Chromatic adaptation.
+
+  float R = var_X * 3.2404542f + var_Y * -1.5371385f + var_Z * -0.4985314f;
+  float G = var_X * -0.9692660f + var_Y * 1.8760108f + var_Z * 0.0415560f;
+  float B = var_X * 0.0556434f + var_Y * -0.2040259f + var_Z * 1.0572252f;
+
+  if (R > 0.0031308f) R = 1.055f * (pow(R, 0.4166666666f)) - 0.055f; // 1.0f / 2.4f = 0.4166666666f
+  else                R = 12.92f * R;
+  if (G > 0.0031308f) G = 1.055f * (pow(G, 0.4166666666f)) - 0.055f;
+  else                G = 12.92f * G;
+  if (B > 0.0031308f) B = 1.055f * (pow(B, 0.4166666666f)) - 0.055f;
+  else                B = 12.92f * B;
+
+  data->x = R;
+  data->y = G;
+  data->z = B;
+}
+void ConvertXyzToSrgb(float4* data)
+{
+  const float X = data->x;
+  const float Y = data->y;
+  const float Z = data->z;
+
+  data->x = X * 3.2404542f + Y * -1.5371385f + Z * -0.4985314f;
+  data->y = X * -0.9692660f + Y * 1.8760108f + Z * 0.0415560f;
+  data->z = X * 0.0556434f + Y * -0.2040259f + Z * 1.0572252f;
+}
+void ConvertXyzToSrgbIcam06(float4* data)
+{
+  const float X = data->x;
+  const float Y = data->y;
+  const float Z = data->z;
+
+  data->x = X * 3.2407f + Y * -0.9693f + Z * 0.0556f;
+  data->y = X * -1.5373f + Y * 1.8760f + Z * -0.2040f;
+  data->z = X * -0.4986f + Y * 0.0416f + Z * 1.0571f;
+}
+void ConvertXyzToLab(float3* data)
+{
+  float var_X = data->x / 95.0470f;   //Observer= 2°, Illuminant= D65 
+  float var_Y = data->y / 100.000f;   //
+  float var_Z = data->z / 108.883f;   //
+
+  if (var_X > 0.008856f) var_X = pow(var_X, 0.33333333f);           //1.0f / 3.0f    = 0.33333333f
+  else                   var_X = (7.787037f * var_X) + 0.13793103f; //16.0f / 116.0f = 0.13793103f
+  if (var_Y > 0.008856f) var_Y = pow(var_Y, 0.33333333f);
+  else                   var_Y = (7.787037f * var_Y) + 0.13793103f;
+  if (var_Z > 0.008856f) var_Z = pow(var_Z, 0.33333333f);
+  else                   var_Z = (7.787037f * var_Z) + 0.13793103f;
+
+  data->x = 116.0f *  var_Y - 16.0f;  // CIE-L
+  data->y = 500.0f * (var_X - var_Y); // CIE-a
+  data->z = 200.0f * (var_Y - var_Z); // CIE-b
+}
+void ConvertXyzToLab(float4* data)
+{
+  float var_X = data->x / 95.0470f;   //Observer= 2°, Illuminant= D65 
+  float var_Y = data->y / 100.000f;   //
+  float var_Z = data->z / 108.883f;   //
+
+  if (var_X > 0.008856f) var_X = pow(var_X, 0.33333333f);           //1.0f / 3.0f    = 0.33333333f
+  else                   var_X = (7.787037f * var_X) + 0.13793103f; //16.0f / 116.0f = 0.13793103f
+  if (var_Y > 0.008856f) var_Y = pow(var_Y, 0.33333333f);
+  else                   var_Y = (7.787037f * var_Y) + 0.13793103f;
+  if (var_Z > 0.008856f) var_Z = pow(var_Z, 0.33333333f);
+  else                   var_Z = (7.787037f * var_Z) + 0.13793103f;
+
+  data->x = 116.0f *  var_Y - 16.0f;  // CIE-L
+  data->y = 500.0f * (var_X - var_Y); // CIE-a
+  data->z = 200.0f * (var_Y - var_Z); // CIE-b
+}
+void ConvertXyzToZlab(float4* data, const float3 whitePoint, const float a_whiteBalance)
+{
+  const float X = data->x;
+  const float Y = data->y;
+  const float Z = data->z;
+
+  const float Xw = whitePoint.x;
+  const float Yw = whitePoint.y;
+  const float Zw = whitePoint.z;
+
+  // ----- chromatic adaptation -----
+
+  // convert to sharpened cone responses using Бредфорский расчёт. 
+
+  const float R = 0.8951f * (X / Y) + 0.2664f * (Y / Y) + -0.1614f * (Z / Y);
+  const float G = -0.7502f * (X / Y) + 1.7135f * (Y / Y) + 0.0367f * (Z / Y);
+  const float B = 0.0389f * (X / Y) + -0.0685f * (Y / Y) + 1.0296f * (Z / Y);
+
+  const float Rw = 0.8951f * (Xw / Yw) + 0.2664f * (Yw / Yw) + -0.1614f * (Zw / Yw);
+  const float Gw = -0.7502f * (Xw / Yw) + 1.7135f * (Yw / Yw) + 0.0367f * (Zw / Yw);
+  const float Bw = 0.0389f * (Xw / Yw) + -0.0685f * (Yw / Yw) + 1.0296f * (Zw / Yw);
+
+  const float p = pow(Bw, 0.0834f);
+  const float D = a_whiteBalance;
+
+  const float Rc = (D * (1.0f / Rw) + 1.0f - D) * R;
+  const float Gc = (D * (1.0f / Gw) + 1.0f - D) * G;
+  float       Bc = (D * (1.0f / pow(Bw, p)) + 1.0f - D) * pow(abs(B), p);
+
+  if (B < 0.0f) Bc = -abs(B);
+
+  // Back all to XYZ with inverse M matrix
+
+  const float Xc = 0.9871f * Rc * Y + -0.1469f * Gc * Y + 0.1597f * Bc * Y;
+  const float Yc = 0.4324f * Rc * Y + 0.5184f * Gc * Y + 0.0491f * Bc * Y;
+  const float Zc = -0.0083f * Rc * Y + 0.0402f * Gc * Y + 0.9687f * Bc * Y;
+
+  // ----- Appearance Correlates -----
+
+
+  const float Lz = 100.0f *  pow(Yc / 100.0f, 0.50025f);
+  const float Az = 500.0f * (pow(Xc / 100.0f, 0.345f) - pow(Yc / 100.0f, 0.345f));
+  const float Bz = 200.0f * (pow(Yc / 100.0f, 0.345f) - pow(Zc / 100.0f, 0.345f));
+
+  data->x = Lz;
+  data->y = Az;
+  data->z = Bz;
+}
 void ConvertHsvToRgb(float4* data)
 {
   float h = data->x;
@@ -188,127 +361,28 @@ void ConvertHsvToRgb(float4* data)
   data->y = g;
   data->z = b;
 }
-
-template <typename T>
-void ConvertRgbToXyz65(T* data)
+void ConvertXyzToRlab(float4* data, float power)
 {
-  float var_R = data->x; //var_R from 0 to 1
-  float var_G = data->y; //var_G from 0 to 1
-  float var_B = data->z; //var_B from 0 to 1
+  const float var_X = data->x / 95.0470f;   //Observer= 2°, Illuminant= D65 
+  const float var_Y = data->y / 100.000f;   //
+  const float var_Z = data->z / 108.883f;   //
 
-  if (var_R > 0.04045f) var_R = pow((var_R + 0.055f) / 1.055f, 2.4f);
-  else                  var_R = var_R / 12.92f;
+  const float p = 1.0f / (2.3f * power + 0.001f);
 
-  if (var_G > 0.04045f) var_G = pow((var_G + 0.055f) / 1.055f, 2.4f);
-  else                  var_G = var_G / 12.92f;
-
-  if (var_B > 0.04045f) var_B = pow((var_B + 0.055f) / 1.055f, 2.4f);
-  else                  var_B = var_B / 12.92f;
-
-  var_R *= 100.0f;
-  var_G *= 100.0f;
-  var_B *= 100.0f;
-
-  //Chromatic adaptation. Observer. = 2°, Illuminant = D65
-
-  data->x = var_R * 0.4124564f + var_G * 0.3575761f + var_B * 0.1804375f;
-  data->y = var_R * 0.2126729f + var_G * 0.7151522f + var_B * 0.0721750f;
-  data->z = var_R * 0.0193339f + var_G * 0.1191920f + var_B * 0.9503041f;
+  data->x = 100.0f *  pow(var_Y, p);                   // L
+  data->y = 430.0f * (pow(var_X, p) - pow(var_Y, p));  // a
+  data->z = 170.0f * (pow(var_Y, p) - pow(var_Z, p));  // b
 }
-
-void ConvertXyz65ToRgb(float4* data)
+void ConvertRlabToXyz(float4* data)
 {
-  float var_X = data->x / 100.0f;  //X from 0 to  95.047      (Observer = 2°, Illuminant = D65)
-  float var_Y = data->y / 100.0f;  //Y from 0 to 100.000
-  float var_Z = data->z / 100.0f;  //Z from 0 to 108.883
+  const float var_Y = pow(data->x / 100.0f, 2.3f);
+  const float var_X = pow(pow(var_Y, 1.0f / 2.3f) + data->y / 430.0f, 2.3f);
+  const float var_Z = pow(pow(var_Y, 1.0f / 2.3f) - data->z / 170.0f, 2.3f);
 
-                                   //Chromatic adaptation.
-
-  float R = var_X * 3.2404542f + var_Y * -1.5371385f + var_Z * -0.4985314f;
-  float G = var_X * -0.9692660f + var_Y * 1.8760108f + var_Z * 0.0415560f;
-  float B = var_X * 0.0556434f + var_Y * -0.2040259f + var_Z * 1.0572252f;
-
-  if (R > 0.0031308f) R = 1.055f * (pow(R, 0.4166666666f)) - 0.055f; // 1.0f / 2.4f = 0.4166666666f
-  else                R = 12.92f * R;
-  if (G > 0.0031308f) G = 1.055f * (pow(G, 0.4166666666f)) - 0.055f;
-  else                G = 12.92f * G;
-  if (B > 0.0031308f) B = 1.055f * (pow(B, 0.4166666666f)) - 0.055f;
-  else                B = 12.92f * B;
-
-  data->x = R;
-  data->y = G;
-  data->z = B;
+  data->x = var_X * 95.047f;   // Observer= 2°, Illuminant= D65
+  data->y = var_Y * 100.0f;    //
+  data->z = var_Z * 108.883f;  //
 }
-
-void ConvertSrgbToXyz(float3* data)
-{
-  const float R = data->x;
-  const float G = data->y;
-  const float B = data->z;
-
-  data->x = R * 0.4124564f + G * 0.3575761f + B * 0.1804375f;
-  data->y = R * 0.2126729f + G * 0.7151522f + B * 0.0721750f;
-  data->z = R * 0.0193339f + G * 0.1191920f + B * 0.9503041f;
-}
-
-void ConvertSrgbToXyz(float4* data)
-{
-  const float R = data->x;
-  const float G = data->y;
-  const float B = data->z;
-
-  data->x = R * 0.4124564f + G * 0.3575761f + B * 0.1804375f;
-  data->y = R * 0.2126729f + G * 0.7151522f + B * 0.0721750f;
-  data->z = R * 0.0193339f + G * 0.1191920f + B * 0.9503041f;
-}
-
-void ConvertXyzToSrgb(float4* data)
-{
-  const float X = data->x;
-  const float Y = data->y;
-  const float Z = data->z;
-
-  data->x = X * 3.2404542f + Y * -1.5371385f + Z * -0.4985314f;
-  data->y = X * -0.9692660f + Y * 1.8760108f + Z * 0.0415560f;
-  data->z = X * 0.0556434f + Y * -0.2040259f + Z * 1.0572252f;
-}
-
-void ConvertXyzToLab(float3* data)
-{
-  float var_X = data->x / 95.0470f;   //Observer= 2°, Illuminant= D65 
-  float var_Y = data->y / 100.000f;   //
-  float var_Z = data->z / 108.883f;   //
-
-  if (var_X > 0.008856f) var_X = pow(var_X, 0.33333333f);           //1.0f / 3.0f    = 0.33333333f
-  else                   var_X = (7.787037f * var_X) + 0.13793103f; //16.0f / 116.0f = 0.13793103f
-  if (var_Y > 0.008856f) var_Y = pow(var_Y, 0.33333333f);
-  else                   var_Y = (7.787037f * var_Y) + 0.13793103f;
-  if (var_Z > 0.008856f) var_Z = pow(var_Z, 0.33333333f);
-  else                   var_Z = (7.787037f * var_Z) + 0.13793103f;
-
-  data->x = 116.0f *  var_Y - 16.0f;  // CIE-L
-  data->y = 500.0f * (var_X - var_Y); // CIE-a
-  data->z = 200.0f * (var_Y - var_Z); // CIE-b
-}
-
-void ConvertXyzToLab(float4* data)
-{
-  float var_X = data->x / 95.0470f;   //Observer= 2°, Illuminant= D65 
-  float var_Y = data->y / 100.000f;   //
-  float var_Z = data->z / 108.883f;   //
-
-  if (var_X > 0.008856f) var_X = pow(var_X, 0.33333333f);           //1.0f / 3.0f    = 0.33333333f
-  else                   var_X = (7.787037f * var_X) + 0.13793103f; //16.0f / 116.0f = 0.13793103f
-  if (var_Y > 0.008856f) var_Y = pow(var_Y, 0.33333333f);
-  else                   var_Y = (7.787037f * var_Y) + 0.13793103f;
-  if (var_Z > 0.008856f) var_Z = pow(var_Z, 0.33333333f);
-  else                   var_Z = (7.787037f * var_Z) + 0.13793103f;
-
-  data->x = 116.0f *  var_Y - 16.0f;  // CIE-L
-  data->y = 500.0f * (var_X - var_Y); // CIE-a
-  data->z = 200.0f * (var_Y - var_Z); // CIE-b
-}
-
 void ConvertLabToXyz(float4* data)
 {
   float var_Y = (data->x + 16.0f) / 116.0f;
@@ -330,10 +404,50 @@ void ConvertLabToXyz(float4* data)
   data->y = var_Y * 100.0f;    //
   data->z = var_Z * 108.883f;  //
 }
+void ConvertZlabToXyz(float4* data, const float3 whitePoint)
+{
+  const float Lz = data->x;
+  const float Az = data->y;
+  const float Bz = data->z;
 
+  const float Rw = whitePoint.x;
+  const float Gw = whitePoint.y;
+  const float Bw = whitePoint.z;
+
+  // ----- Appearance Correlates -----
+
+  const float Yc = pow(Lz, 1.999f);
+  const float Xc = pow(pow(Yc, 0.345f) + Az / 5.0f, 2.8985f);
+  const float Zc = pow(pow(Yc, 0.345f) - Bz / 2.0f, 2.8985f);
+
+  // ----- chromatic adaptation -----
+
+  // M matrix
+
+  const float Rc = 0.8951f * Xc + 0.2664f * Yc + -0.1614f * Zc;
+  const float Gc = -0.7502f * Xc + 1.7135f * Yc + 0.0367f * Zc;
+  const float Bc = 0.0389f * Xc + -0.0685f * Yc + 1.0296f * Zc;
+
+  const float D = 0.0f;
+  const float p = pow(Bw, 0.0834f);
+
+  const float R = Rc / (D * (1.0f / Rw) + 1.0f - D);
+  const float G = Gc / (D * (1.0f / Gw) + 1.0f - D);
+  const float B = pow(abs(Bc / (D * (1.0f / pow(Bw, p)) + 1.0f - D)), 1 / p);
+
+  // inverse M matrix
+
+  const float X = 0.9871f * R + -0.1469f * G + 0.1597f * B;
+  const float Y = 0.4324f * R + 0.5184f * G + 0.0491f * B;
+  const float Z = -0.0083f * R + 0.0402f * G + 0.9687f * B;
+
+  data->x = Xc * 100.0f;
+  data->y = Yc * 100.0f;
+  data->z = Zc * 100.0f;
+}
 void MatrixCat02(float3* data)
 {
-  // conversion into cones. Mcat02 in CAM02. 
+  // Conversion to cone responses. Mcat02 in CAM02. 
   const float R = 0.7328f * data->x + 0.4296f * data->y + -0.1624f * data->z;
   const float G = -0.7036f * data->x + 1.6975f * data->y + 0.0061f * data->z;
   const float B = 0.0030f * data->x + 0.0136f * data->y + 0.9834f * data->z;
@@ -344,7 +458,7 @@ void MatrixCat02(float3* data)
 }
 void MatrixCat02(float4* data)
 {
-  // conversion into cones. Mcat02 in CAM02. 
+  // Conversion to cone responses. Mcat02 in CAM02. 
 
   const float R = 0.7328f * data->x + 0.4296f * data->y + -0.1624f * data->z;
   const float G = -0.7036f * data->x + 1.6975f * data->y + 0.0061f * data->z;
@@ -354,7 +468,6 @@ void MatrixCat02(float4* data)
   data->y = G;
   data->z = B;
 }
-
 template <typename T>
 void InverseMatrixCat02(T* data)
 {
@@ -367,11 +480,10 @@ void InverseMatrixCat02(T* data)
   data->y = Y;
   data->z = Z;
 }
-
 template <typename T>
 void MatrixHpe(T* data)
 {
-  // conversion into cones. Matrix HPE in CAM02. (Hunt-Pointer-Estevez)
+  // Conversion to cone responses. Matrix HPE in CAM02. (Hunt-Pointer-Estevez)
   const float L = 0.38971f * data->x + 0.68898f * data->y + -0.07868f * data->z; //Kuo modify −0.07869
   const float M = -0.22981f * data->x + 1.18340f * data->y + 0.04641f * data->z; //            0.04642f ?
   const float S = data->z;
@@ -391,7 +503,65 @@ void InverseMatrixHpe(float4 * data)
   data->y = G;
   data->z = B;
 }
+void ConvertXyzToLmsVonKries(float4* data)
+{
+  const float L = 0.4002400f * data->x + 0.7076000f * data->y + -0.0808100f * data->z;
+  const float M = -0.2263000f * data->x + 1.1653200f * data->y + 0.0457000f * data->z;
+  const float S = 0.9182200f * data->z;
 
+  data->x = L;
+  data->y = M;
+  data->z = S;
+}
+void ConvertLmsToXyzVonKries(float4* data)
+{
+  const float L = data->x;
+  const float M = data->y;
+  const float S = data->z;
+
+  data->x = 1.8599364f * L + -1.1293816f * M + 0.2198974f * S;
+  data->y = 0.3611914f * L + 0.6388125f * M + -0.0000064f * S;
+  data->z = 1.0890636f * S;
+}
+void inverseChromAdaptFairchild(float4* data, const float3 whitePoint, const float D)
+{
+  const float Xref = data->x;
+  const float Yref = data->y;
+  const float Zref = data->z;
+
+  const float Ln = whitePoint.x;
+  const float Mn = whitePoint.y;
+  const float Sn = whitePoint.z;
+
+  // inverse R matrix
+
+  const float L = 0.3805f * Xref + 0.7075f * Yref + -0.0881f * Zref;
+  const float M = -0.2150f * Xref + 1.1655f * Yref + 0.0500f * Zref;
+  const float S = Zref;
+
+  // inverse A matrix
+
+  const float Yn = 318.0f; // абсолютная адапт. яркость в cd/m2 (эталон для RLab = 318 cd/m2)
+
+  const float lE = (3.0f * Ln) / (Ln + Mn + Sn);
+  const float mE = (3.0f * Mn) / (Ln + Mn + Sn);
+  const float sE = (3.0f * Sn) / (Ln + Mn + Sn);
+
+  const float pL = (1.0f + pow(Yn, 0.3333f) + lE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / lE);
+  const float pM = (1.0f + pow(Yn, 0.3333f) + mE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / mE);
+  const float pS = (1.0f + pow(Yn, 0.3333f) + sE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / sE);
+
+  const float aL = (pL + D * (1.0f - pL)) / Ln;
+  const float aM = (pM + D * (1.0f - pM)) / Mn;
+  const float aS = (pS + D * (1.0f - pS)) / Sn;
+
+  data->x /= aL;
+  data->y /= aM;
+  data->z /= aS;
+
+  // inverse M matrix
+  InverseMatrixHpe(data);
+}
 void ConvertXyzToLms(float4* data)
 {
   float L = 0.4002f * data->x + 0.7075f * data->y + -0.0807f * data->z;
@@ -411,17 +581,6 @@ void ConvertXyzToLms(float4* data)
   data->y = M;
   data->z = S;
 }
-void ConvertLmsToXyz(float4* data)
-{
-  float L = data->x;
-  float M = data->y;
-  float S = data->z;
-
-  data->x = 1.8493f * L + -1.1383f * M + 0.2381f * S;
-  data->y = 0.3660f * L + 0.6444f * M + -0.010f  * S;
-  data->z = 1.0893f * S;
-}
-
 void ConvertXyzToLmsPower(float4 * data, const float power)
 {
   float L = 0.4002f * data->x + 0.7075f * data->y + -0.0807f * data->z;
@@ -431,37 +590,46 @@ void ConvertXyzToLmsPower(float4 * data, const float power)
   const float a = power;
 
   if (L >= 0.0f) L = pow(L, a);
-  else if (L <  0.0f) L = -pow(-L, a);
+  else if (L < 0.0f) L = -pow(-L, a);
   if (M >= 0.0f) M = pow(M, a);
-  else if (M <  0.0f) M = -pow(-M, a);
+  else if (M < 0.0f) M = -pow(-M, a);
   if (S >= 0.0f) S = pow(S, a);
-  else if (S <  0.0f) S = -pow(-S, a);
+  else if (S < 0.0f) S = -pow(-S, a);
 
   data->x = L;
   data->y = M;
   data->z = S;
 }
-
-void ConvertLmsToXyzPower(float4* data)
+void ExponentIcam(float4* data, const float4* dataBlur)
 {
   float L = data->x;
   float M = data->y;
   float S = data->z;
 
-  const float a = 2.3255819f; //  = 1.0f / 0.43f;
+  const float La = 1.0f + dataBlur->y;
 
-  if (L >= 0.0f) L = pow(L, a);
-  else if (L <  0.0f) L = -pow(-L, a);
-  if (M >= 0.0f) M = pow(M, a);
-  else if (M <  0.0f) M = -pow(-M, a);
-  if (S >= 0.0f) S = pow(S, a);
-  else if (S <  0.0f) S = -pow(-S, a);
+  float Fl = 0.2f * pow(1.0f / (5.0f * La + 1.0f), 4.0f) * (5.0f * La) +
+    0.1f * pow(1.0f - pow(1.0f / (5.0f * La + 1.0f), 4.0f), 2.0f) * pow(5.0f * La, 0.3333333f);
 
-  data->x = 1.8493f * L + -1.1383f * M + 0.2381f * S;
-  data->y = 0.3660f * L + 0.6444f * M + -0.010f  * S;
-  data->z = 1.0893f * S;
+  Fl /= 1.7f;
+
+  if (Fl < 0.3f) Fl = 0.3f;
+
+  const float a = 0.43f * Fl;
+
+  if (L >= 0.0f) data->x = pow(L, a);
+  else if (L < 0.0f) data->x = -pow(-L, a);
+
+  if (M >= 0.0f) data->y = pow(M, a);
+  else if (M < 0.0f) data->y = -pow(-M, a);
+
+  if (S >= 0.0f) data->z = pow(S, a);
+  else if (S < 0.0f) data->z = -pow(-S, a);
+
+  //data->x = dataBlur->x;
+  //data->y = dataBlur->y;
+  //data->z = dataBlur->z;
 }
-
 void ConvertLmsToIpt(float4* data)
 {
   const float I = 0.4000f * data->x + 0.4000f * data->y + 0.2000f * data->z;
@@ -472,7 +640,35 @@ void ConvertLmsToIpt(float4* data)
   data->y = P;
   data->z = T;
 }
+void ConvertLmsToXyz(float4* data)
+{
+  float L = data->x;
+  float M = data->y;
+  float S = data->z;
 
+  data->x = 1.8493f * L + -1.1383f * M + 0.2381f * S;
+  data->y = 0.3660f * L + 0.6444f * M + -0.010f  * S;
+  data->z = 1.0893f * S;
+}
+void ConvertLmsToXyzPower(float4* data)
+{
+  float L = data->x;
+  float M = data->y;
+  float S = data->z;
+
+  const float a = 2.3255819f; //  = 1.0f / 0.43f;
+
+  if (L >= 0.0f) L = pow(L, a);
+  else if (L < 0.0f) L = -pow(-L, a);
+  if (M >= 0.0f) M = pow(M, a);
+  else if (M < 0.0f) M = -pow(-M, a);
+  if (S >= 0.0f) S = pow(S, a);
+  else if (S < 0.0f) S = -pow(-S, a);
+
+  data->x = 1.8493f * L + -1.1383f * M + 0.2381f * S;
+  data->y = 0.3660f * L + 0.6444f * M + -0.010f  * S;
+  data->z = 1.0893f * S;
+}
 void ConvertIptToLms(float4* data)
 {
   const float L = 0.9999f * data->x + 0.0970f * data->y + 0.2053f * data->z;
@@ -483,7 +679,54 @@ void ConvertIptToLms(float4* data)
   data->y = M;
   data->z = S;
 }
+void ChromAdaptFairchild(float4* data, const float3 whitePoint, const float D)
+{
+  float3 dataW = whitePoint;
 
+  // XYZ input
+  // конверт в колбочки
+  MatrixHpe(data);
+  MatrixHpe(&dataW);
+
+
+  float L = data->x;
+  float M = data->y;
+  float S = data->z;
+
+  const float Ln = dataW.x;
+  const float Mn = dataW.y;
+  const float Sn = dataW.z;
+
+  // A matrix
+
+  const float Yn = 318.0f; // абсолютная адапт. яркость в cd/m2 (эталон для RLab = 318 cd/m2)
+
+  const float lE = (3.0f * Ln) / (Ln + Mn + Sn);
+  const float mE = (3.0f * Mn) / (Ln + Mn + Sn);
+  const float sE = (3.0f * Sn) / (Ln + Mn + Sn);
+
+  const float pL = (1.0f + pow(Yn, 0.3333f) + lE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / lE);
+  const float pM = (1.0f + pow(Yn, 0.3333f) + mE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / mE);
+  const float pS = (1.0f + pow(Yn, 0.3333f) + sE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / sE);
+
+  const float aL = (pL + D * (1.0f - pL)) / Ln;
+  const float aM = (pM + D * (1.0f - pM)) / Mn;
+  const float aS = (pS + D * (1.0f - pS)) / Sn;
+
+  L *= aL;
+  M *= aM;
+  S *= aS;
+
+  // R matrix. (inverse M and A matrix with little correction)
+
+  const float Xref = 1.9569f * L + -1.1882f * M + 0.2313f * S;
+  const float Yref = 0.3612f * L + 0.6388f * M;
+  const float Zref = S;
+
+  data->x = Xref;
+  data->y = Yref;
+  data->z = Zref;
+}
 void ChromAdaptIcam(float4* data, float3 dataW, float3 d65, const float D)
 {
   MatrixCat02(data);
@@ -502,32 +745,316 @@ void ChromAdaptIcam(float4* data, float3 dataW, float3 d65, const float D)
 
   InverseMatrixCat02(data);
 }
-
-
-
-void Blend(float& inData1, const float& inData2, const float coeff) // 0 - data1, 1 - data2
+void InverseChromAdaptIcam(float4* data, const float D)
 {
-  inData1 = inData1 + (inData2 - inData1) * coeff;
+  static const float3 xyz_d65 = { 0.9505f, 1.0f, 1.0888f };
+  static const float Xd65 = 0.8562f * xyz_d65.x + 0.3372f * xyz_d65.y + -0.1934f * xyz_d65.z;
+  static const float Yd65 = -0.8360f * xyz_d65.x + 1.8327f * xyz_d65.y + 0.0033f * xyz_d65.z;
+  static const float Zd65 = 0.0357f * xyz_d65.x + -0.0469f * xyz_d65.y + 1.0112f * xyz_d65.z;
+
+  const float R = 0.8562f * data->x + 0.3372f * data->y + -0.1934f * data->z;
+  const float G = -0.8360f * data->x + 1.8327f * data->y + 0.0033f * data->z;
+  const float B = 0.0357f * data->x + -0.0469f * data->y + 1.0112f * data->z;
+
+  const float Rc = (D * Xd65 / Xd65 + 1.0f - D) * R;
+  const float Gc = (D * Yd65 / Yd65 + 1.0f - D) * G;
+  const float Bc = (D * Zd65 / Zd65 + 1.0f - D) * B;
+
+  const float Xadapt = 0.9873f * Rc + -0.1768f * Gc + 0.1894f * Bc;
+  const float Yadapt = 0.4504f * Rc + 0.4649f * Gc + 0.0846f * Bc;
+  const float Zadapt = -0.0139f * Rc + 0.0278f * Gc + 0.9861f * Bc;
+
+  data->x = Xadapt;
+  data->y = Yadapt;
+  data->z = Zadapt;
+}
+void ChromAdaptCam02(float4* data, const float3 dataW, float D)
+{
+  MatrixCat02(data);
+
+  // D65 offset: 95.047f / 100.0f = 0.95047f
+  // D65 offset: 108.883 / 100.0f = 1.08883f
+  const float Rc = (0.95047f * D / dataW.x + (1.0f - D)) * data->x;
+  const float Gc = (D / dataW.y + (1.0f - D)) * data->y;
+  const float Bc = (1.08883f * D / dataW.z + (1.0f - D)) * data->z;
+
+  data->x = Rc;
+  data->y = Gc;
+  data->z = Bc;
+
+  InverseMatrixCat02(data);
+}
+void InverseChromAdaptCam02(float4* data, const float3* dataW, const float Fl, const float D, const float c)
+{
+  MatrixCat02(data);
+
+  const float Rc = data->x;
+  const float Gc = data->y;
+  const float Bc = data->z;
+
+  const float R = Rc / (100.0f * D / dataW->x + 1.0f - D);
+  const float G = Gc / (100.0f * D / dataW->y + 1.0f - D);
+  const float B = Bc / (100.0f * D / dataW->z + 1.0f - D);
+
+  data->x = R;
+  data->y = G;
+  data->z = B;
+
+  InverseMatrixCat02(data); // Return XYZ
+}
+void OpponentColorCam02(float4* data, const float maxRgbSource, float & La, float & k, float & Fl, const float c, const float z, const float Nbb, const float Aw)
+{
+  MatrixHpe(data);
+
+  const float R1 = data->x;
+  const float G1 = data->y;
+  const float B1 = data->z;
+
+  La = 0.2f * maxRgbSource; // adaptation field's absolute luminance
+  k = 1.0f / (5.0f * La + 1.0f);
+  Fl = 0.2f * pow(k, 4.0f) * (5.0f * La) + 0.1f * pow(1.0f - pow(k, 4.0f), 2.0f) * pow(5.0f * La, 0.333333f);
+
+  float signR = 1.0f;
+  float signG = 1.0f;
+  float signB = 1.0f;
+
+  if (R1 < 0.0f) signR = -signR;
+  if (G1 < 0.0f) signG = -signG;
+  if (B1 < 0.0f) signB = -signB;
+
+  const float R1a = signR * ((400.0f * pow(Fl * abs(R1) / 100.0f, 0.42f)) / (27.13f + pow(Fl * abs(R1) / 100.0f, 0.42f))) + 0.1f;
+  const float G1a = signG * ((400.0f * pow(Fl * abs(G1) / 100.0f, 0.42f)) / (27.13f + pow(Fl * abs(G1) / 100.0f, 0.42f))) + 0.1f;
+  const float B1a = signB * ((400.0f * pow(Fl * abs(B1) / 100.0f, 0.42f)) / (27.13f + pow(Fl * abs(B1) / 100.0f, 0.42f))) + 0.1f;
+
+  const float A = (2.0f * R1a + G1a + B1a / 20.0f - 0.305f) * Nbb; // achromatic response
+
+  const float J = 100.0f * pow(A / Aw, c * z);              // lightness
+  const float a = R1a - 12.0f * G1a / 11.0f + B1a / 11.0f;
+  const float b = (R1a + G1a - 2.0f * B1a) / 9.0f;
+
+  data->x = J;
+  data->y = a;
+  data->z = b;
+}
+void InverseOpponentColorCam02(float4* data, float& Fl, const float c, const float z, const float Nbb, const float Aw)
+{
+  const float J = data->x;
+  const float a = data->y;
+  const float b = data->z;
+
+  const float A = Aw * pow(J / 100.0f, 1.0f / (c * z));
+  const float p2 = A / Nbb + 0.305f;
+
+  const float R1a = 460.0f / 1403.0f * p2 + 451.0f / 1403.0f * a + 288.00f / 1403.0f * b;
+  const float G1a = 460.0f / 1403.0f * p2 - 891.0f / 1403.0f * a + 261.00f / 1403.0f * b;
+  const float B1a = 460.0f / 1403.0f * p2 - 220.0f / 1403.0f * a - 6300.0f / 1403.0f * b;
+
+  float sign = 1.0f;
+
+  if (R1a - 0.1f == 0.0f) sign = 0.0f;
+  if (G1a - 0.1f == 0.0f) sign = 0.0f;
+  if (B1a - 0.1f == 0.0f) sign = 0.0f;
+  if (R1a - 0.1f < 0.0f)  sign = -1.0f;
+  if (G1a - 0.1f < 0.0f)  sign = -1.0f;
+  if (B1a - 0.1f < 0.0f)  sign = -1.0f;
+
+  float R1 = sign * (R1a - 0.1f) * 100.0f / Fl * pow((27.13f * abs(R1a - 0.1f)) / (400.0f - abs(R1a - 0.1f)), 2.380952f); // 2.380952 = 1 / 0.42
+  float G1 = sign * (G1a - 0.1f) * 100.0f / Fl * pow((27.13f * abs(G1a - 0.1f)) / (400.0f - abs(G1a - 0.1f)), 2.380952f);
+  float B1 = sign * (B1a - 0.1f) * 100.0f / Fl * pow((27.13f * abs(B1a - 0.1f)) / (400.0f - abs(B1a - 0.1f)), 2.380952f);
+
+  data->x = R1;
+  data->y = G1;
+  data->z = B1;
+
+  InverseMatrixHpe(data);
+}
+void ToneCompressionIcam(float4 inData[], const float &whiteImage, const float maxRgbSource, const float maxRgbSourceBlur)
+{
+  float4 dataHpe = *inData;
+  MatrixHpe(&dataHpe);
+
+  const float R1 = dataHpe.x;
+  const float G1 = dataHpe.y;
+  const float B1 = dataHpe.z;
+
+  //S is the luminance of each pixel in the chromatic adapted image, i.e., 
+  //the Y image, and Sw is the value of S for the reference white.
+  //By setting Sw to a global scale from the maximum value of the local adapted white point image,
+  //the rod response output is automatically adjusted by the general luminance perception of the scene.
+  // Yw is the luminance of the local adapted white image.
+
+  // cone response
+
+  const float La = 0.2f * whiteImage;
+  const float k = 1.0f / (5.0f * La + 1.0f);
+  const float Fl = 0.2f * pow(k, 4.0f) * (5.0f * La) + 0.1f * pow(1.0f - pow(k, 4.0f), 2.0f) * pow(5.0f * La, 0.333333f);
+
+  // compression
+  const float p = 0.75f; // 0.6 - 0.85
+  const float Yw = maxRgbSource;
+
+  float signR = 1.0f;
+  float signG = 1.0f;
+  float signB = 1.0f;
+
+  if (R1 < 0.0f) signR = -signR;
+  if (G1 < 0.0f) signG = -signG;
+  if (B1 < 0.0f) signB = -signB;
+
+  const float R1a = signR * ((400.0f * pow(Fl * abs(R1) / Yw, p)) / (27.13f + pow(Fl * abs(R1) / Yw, p))) + 0.1f;
+  const float G1a = signG * ((400.0f * pow(Fl * abs(G1) / Yw, p)) / (27.13f + pow(Fl * abs(G1) / Yw, p))) + 0.1f;
+  const float B1a = signB * ((400.0f * pow(Fl * abs(B1) / Yw, p)) / (27.13f + pow(Fl * abs(B1) / Yw, p))) + 0.1f;
+
+  // make a netural As Rod response
+  const float Las = 2.26f * La;
+  const float j = 0.00001f / (5.0f * Las / 2.26f + 0.00001f);
+  const float Fls = 3800.0f * (j * j) * (5.0f * Las / 2.26f) + 0.2f * pow(1.0f - j * j, 4.0f) * pow(5.0f * Las / 2.26f, 1.0f / 6.0f);
+  const float Sw = whiteImage;
+  const float S = inData->y;
+
+  // BS is the rod pigment bleach or satruration factor
+  const float Bs = 0.5f / (1.0f + 0.3f * pow((5.0f * Las / 2.26f) * (S / Sw), 0.3f))
+    + 0.5f / (1.0f + 5.0f *     (5.0f * Las / 2.26f));
+
+  // Noise term in Rod response is 1 / 3 of that in Cone response because Rods are more sensitive
+  const float As = 3.05f * Bs * (400.0f * pow(Fls * S / Sw, p)) / (27.13f + pow(Fls * S / Sw, p)) + 0.3f;
+
+  // combine Cone and Rod response
+  inData->x = R1a + As;
+  inData->y = G1a + As;
+  inData->z = B1a + As;
+
+  InverseMatrixHpe(inData);
+
+
+  // colorfulness adjustment - Hunt effect  in IPT color space       
+  //ConvertXyzToLmsPower(inData, 1.0f);
+  //ConvertLmsToIpt(inData);  
+
+  //const float C = sqrtf(inData->y * inData->y + inData->z * inData->z);
+  //const float multColor = (pow(Fl + 1.0f, 0.2f) * ((1.29f * C * C - 0.27f * C + 0.42f) / (C * C - 0.31f * C + 0.42f)));
+  //inData->y *= multColor;
+  //inData->z *= multColor;
+
+  //ConvertIptToLms(inData);
+  //ConvertLmsToXyzPower(inData);
+}
+
+float3 Mediana(const float4* inData, const int size, const int a_width, const int a_height, const int x, const int y)
+{
+  int a = 0;
+  std::vector<float> medianaR(size*size);
+  std::vector<float> medianaG(size*size);
+  std::vector<float> medianaB(size*size);
+
+  const int halfSize = (size - 1) / 2.0f;
+
+  for (int i = -halfSize; i <= halfSize; ++i)
+  {
+    for (int j = -halfSize; j <= halfSize; ++j)
+    {
+      int Y = y + i;
+      int X = x + j;
+
+      if (Y < 0)         Y = 1;
+      else if (Y >= a_height) Y = a_height - 1;
+      if (X < 0)         X = 1;
+      else if (X >= a_width)  X = a_width - 1;
+
+      medianaR[a] = inData[Y * a_width + X].x;
+      medianaG[a] = inData[Y * a_width + X].y;
+      medianaB[a] = inData[Y * a_width + X].z;
+
+      a++;
+    }
+  }
+  sort(medianaR.begin(), medianaR.end());
+  sort(medianaG.begin(), medianaG.end());
+  sort(medianaB.begin(), medianaB.end());
+
+  const int a2 = size * size / 2.0f + 0.5f;
+  return { medianaR[a2], medianaG[a2], medianaB[a2] };
+}
+
+void Mediana(float inData[], const int radius, const int a_width, const int a_height, const int sizeImage)
+{
+  std::vector<float> tmpData(sizeImage);
+
+  int sizeMediana = (radius * 2 + 1) * (radius * 2 + 1);
+  std::vector<float> mediana(sizeMediana);
+
+  if (radius == 1) sizeMediana = 10;
+
+  for (int y = 0; y < a_height; ++y)
+  {
+    for (int x = 0; x < a_width; ++x)
+    {
+      int a = 0;
+
+      for (int i = -radius; i <= radius; ++i)
+      {
+        for (int j = -radius; j <= radius; ++j)
+        {
+          int Y = y + i;
+          int X = x + j;
+
+          if (Y < 0)         Y = 1;
+          else if (Y >= a_height) Y = a_height - 1;
+          if (X < 0)         X = 1;
+          else if (X >= a_width)  X = a_width - 1;
+
+          mediana[a] = inData[Y * a_width + X];
+          a++;
+        }
+      }
+      sort(mediana.begin(), mediana.end());
+
+      tmpData[y * a_width + x] = mediana[sizeMediana / 2];
+    }
+  }
+
+#pragma omp parallel for
+  for (int i = 0; i < sizeImage; ++i)
+    inData[i] = tmpData[i];
+}
+
+void FireflyDetects(const float4* image4out, float3* fireflyPixels, const int a_width, const int a_height, const int x, const int y, const int i, const float a_fireflyRemove)
+{
+  fireflyPixels[i] = { 0.0f, 0.0f, 0.0f };
+
+  const float3 mediana = Mediana(image4out, 3, a_width, a_height, x, y);
+
+  const float weight = 110.0f - a_fireflyRemove * 100.0f;
+
+  const float meanRGB = (image4out[i].x + image4out[i].y + image4out[i].z) / 3.0f;
+  const float meanMediana = (mediana.x + mediana.y + mediana.z) / 3.0f * weight;
+
+  if (meanRGB > meanMediana)
+  {
+    fireflyPixels[i].x = mediana.x;
+    fireflyPixels[i].y = mediana.y;
+    fireflyPixels[i].z = mediana.z;
+  }
+}
+
+void Blend(float& inData1, const float& inData2, const float amount) // 0 - data1, 1 - data2
+{
+  inData1 = inData1 + (inData2 - inData1) * amount;
 }
 
 template <typename T>
 void Normalize(T& data, const float inMin, const float inMax, const float outMin, const float outMax)
 {
-  // Normalize y = (inCurrent - inMin) * (outMax - outMin) / (inMax - inMin) + outMin
-  // inCurrent - value to be normalized
-  // [Xmin, Xmax] - the interval of x values
-  // [outMin, outMax] - Interval, which is given the value of x.
   data = (data - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
+
 void OffsetCenter(float& data, const float inMin, const float inMax, const float coef)
 {
-  // function to shift the center of the range by a coef.
-  Normalize(data, inMin, inMax, 0, 1); 
-
+  Normalize(data, inMin, inMax, 0, 1);
   data = pow(data, coef);
-
-  Normalize(data, 0, 1, inMin, inMax);  
+  Normalize(data, 0, 1, inMin, inMax);
 }
+
 void ContrastField(float& data, const float amount)
 {
   if (data > 0.0f && data < 1.0f)
@@ -537,23 +1064,25 @@ void ContrastField(float& data, const float amount)
     Blend(data, outData, amount);
   }
 }
+
 void Compress(float& data, const float maxRgb)
 {
   data = (data * (1.0f + data / (maxRgb * maxRgb))) / (1.0f + data);
 }
 
-void CalculateHistogram(const float& data, float histogram[], const int histogramBin, const float iterrHistogramBin)
+void CalculateHistogram(const float& data, float histogram[], const int histogramBin)
 {
   if (data <= 1.0f)
   {
     // Current bin.      
-    const int currentHistogramBin = (int)((data * float(histogramBin - 1)) + 0.5f);
+    const int currentHistogramBin = (data * float(histogramBin - 1)) + 0.5f;
 
     // Increase count currents bin.
     if (currentHistogramBin >= 0 && currentHistogramBin < histogramBin)
-      histogram[currentHistogramBin] += iterrHistogramBin;
+      histogram[currentHistogramBin] += 1.0f;
   }
 }
+
 void UniformHistogram(float histogram[], const int histogramBin)
 {
   // Recalculate histogramm
@@ -568,7 +1097,7 @@ void NormalizeHistogram(float histogram[], const int histogramBin)
   float histMax = 0.0f;
 
   // Calculate min and max value
-  //#pragma omp parallel for
+//#pragma omp parallel for
   for (int i = 0; i < histogramBin; ++i)
   {
     if (histogram[i] < histMin && histogram[i] != 0)
@@ -579,7 +1108,7 @@ void NormalizeHistogram(float histogram[], const int histogramBin)
   }
 
   // Normalize to 0 - 1
-  #pragma omp parallel for
+#pragma omp parallel for
   for (int i = 0; i < histogramBin; ++i)
   {
     Normalize(histogram[i], histMin, histMax, 0.0f, 1.0f);
@@ -594,19 +1123,20 @@ void UniformContrastRgb(float* data, const int sizeImage, const int histogramBin
 
   std::vector<float> histogram(histogramBin);
 
-  // --- Calculate histogram ---
+  // --- Calculate the histogram ---
   //#pragma omp parallel for
   for (int i = 0; i < sizeImage * 3; i++)
   {
     if (data[i] <= 1.0f)
-    {      
+    {
       const int currentHistogramBin = (int)round(data[i] * float(histogramBin - 1));
-           
+
       if (currentHistogramBin >= 0 && currentHistogramBin < histogramBin)
         histogram[currentHistogramBin] += iterrHistogramBin;
     }
   }
 
+  // Recalculate the histogram (redistribution)
   for (int i = 1; i < histogramBin; i++)
     histogram[i] = histogram[i - 1] + histogram[i];
 
@@ -620,11 +1150,12 @@ void UniformContrastRgb(float* data, const int sizeImage, const int histogramBin
       histMax = histogram[i];
   }
 
-  #pragma omp parallel for
+#pragma omp parallel for
   for (int i = 0; i < histogramBin; i++)
     Normalize(histogram[i], histMin, histMax, 0.0f, 1.0f);
 
-  #pragma omp parallel for
+  // Assign a brightness histogram.
+#pragma omp parallel for
   for (int i = 0; i < sizeImage * 3; i++)
   {
     if (data[i] <= 1.0f)
@@ -651,9 +1182,9 @@ void AssignHistogramToData(float& data, const float* histogram, const int histog
       data = 0.0f;
   }
 }
-void UniformContrastField0(float4* data, const int sizeImage, const int histogramBin)
+void UniformContrast(float data[], const int sizeImage, const int histogramBin)
 {
-  #define MAX3(x,y,z)  ((y) >= (z) ? ((x) >= (y) ? (x) : (y)) : ((x) >= (z) ? (x) : (z)))
+#define MAX3(x,y,z)  ((y) >= (z) ? ((x) >= (y) ? (x) : (y)) : ((x) >= (z) ? (x) : (z)))
 
   float histMin = 10000000.0f;
   float histMax = 0.0f;
@@ -662,21 +1193,24 @@ void UniformContrastField0(float4* data, const int sizeImage, const int histogra
 
   std::vector<float> histogram(histogramBin);
 
+  // --- Calculate the histogram ---
   //#pragma omp parallel for
   for (int i = 0; i < sizeImage; i++)
   {
-    data[i].x = data[i].x / (1.0f + data[i].x);
+    data[i] = data[i] / (1.0f + data[i]);
 
-    const int currentHistogramBin = (int)round(data[i].x * float(histogramBin - 1));
+    const int currentHistogramBin = (int)round(data[i] * float(histogramBin - 1));
 
     if (currentHistogramBin >= 0 && currentHistogramBin < histogram.size())
       histogram[currentHistogramBin] += iterrHistogramBin;
   }
 
+  // Recalculate the histogram (redistribution)
   for (int i = 1; i < histogramBin; i++)
     histogram[i] = histogram[i - 1] + histogram[i];
 
-  #pragma omp parallel for
+
+#pragma omp parallel for
   for (int i = 0; i < histogramBin; i++)
   {
     if (histogram[i] < histMin && histogram[i] != 0)
@@ -686,21 +1220,25 @@ void UniformContrastField0(float4* data, const int sizeImage, const int histogra
       histMax = histogram[i];
   }
 
-  #pragma omp parallel for
+#pragma omp parallel for
   for (int i = 0; i < histogramBin; i++)
     Normalize(histogram[i], histMin, histMax, 0.0f, 1.0f);
 
-  #pragma omp parallel for
+
+
+  // Assign a brightness histogram.
+#pragma omp parallel for
   for (int i = 0; i < sizeImage; i++)
   {
-    const int currentHistogramBin = (int)round(data[i].x * float(histogramBin - 1));
+    const int currentHistogramBin = (int)round(data[i] * float(histogramBin - 1));
 
     if (currentHistogramBin >= 0 && currentHistogramBin < histogram.size())
-      data[i].x = pow(histogram[currentHistogramBin], 2.2f);
+      data[i] = pow(histogram[currentHistogramBin], 2.2f);
     else
-      data[i].x = 0.0f;
+      data[i] = 0.0f;
   }
 }
+
 float Distance(const float x1, const float y1, const float x2, const float y2)
 {
   float differenceX = x1 - x2;
@@ -717,8 +1255,8 @@ void Bilinear(const float inData, float outData[], float newPosX, float newPosY,
   // | dxy1 | dxy2 |
   // |------|------|
 
-  const int floorY = (int)floor(newPosY);
-  const int floorX = (int)floor(newPosX);
+  const int floorY = floor(newPosY);
+  const int floorX = floor(newPosX);
 
   const int     dxy1 = floorY * m_width + floorX;
   int           dxy2 = dxy1 + 1;
@@ -754,8 +1292,8 @@ void Bilinear3(const float3 inData, float3 outData[], float newPosX, float newPo
   // | dxy1 | dxy2 |
   // |------|------|
 
-  const int floorY = (int)floor(newPosY);
-  const int floorX = (int)floor(newPosX);
+  const int floorY = floor(newPosY);
+  const int floorX = floor(newPosX);
 
   const int     dxy1 = floorY * m_width + floorX;
   int           dxy2 = dxy1 + 1;
@@ -793,6 +1331,7 @@ void Bilinear3(const float3 inData, float3 outData[], float newPosX, float newPo
     outData[dxy4].z += inData.z * multBrightness4;
   }
 }
+
 void ClampMinusToZero(float4* data4, const int i)
 {
   if (data4[i].x < 0) data4[i].x = 0;
@@ -820,17 +1359,17 @@ void Vignette(float4* data4, const int m_width, const int m_height, const float 
 }
 void SummValueOnField(const float4 data[], float3* summRgb, const int i)
 {
-  #pragma omp atomic
+#pragma omp atomic
   summRgb->x += data[i].x;
-  #pragma omp atomic
+#pragma omp atomic
   summRgb->y += data[i].y;
-  #pragma omp atomic
+#pragma omp atomic
   summRgb->z += data[i].z;
 }
 void ChrommAberr(const float4 inData[], float outData1[], float outData2[], const int m_width, const int m_height, const int sizeImage, const float a_chromAberr, const int x, const int y, const int i)
 {
-  // Generate velocity map.
-  // (-1, -1) - left bottom, (0, 0) - not move. (1, 1) - right top.  Red > green > blue.
+  // Генерируем карту велосити.
+  // (-1, -1) - влево вниз, (0, 0) - нет движения. (1, 1) - вправо вверх.  Красный > зелёный > синий.
   const float stepVelocityX = (float)x / m_width;
   const float stepVelocityY = (float)y / m_height;
   const float velocityX = stepVelocityX * 2.0f - 1.0f; // -1.0f to 1.0f
@@ -853,6 +1392,7 @@ void ComputeWhitePoint(const float3 summRgb, float3* whitePoint, const int sizeI
 }
 void MinMaxRgb(float4* data, float& minRgb, float& maxRgb, const float thresholdFloor, const int i)
 {
+  omp_set_lock;
   if (data[i].x < minRgb && data[i].x > 0.0f) minRgb = data[i].x;
   if (data[i].x > maxRgb)                     maxRgb = data[i].x;
 
@@ -903,11 +1443,12 @@ void DrawColumn(float4 data[], const int width, const int height, const int offs
     }
   }
 }
+
 void ViewHistorgam(float4 data[], float3* histogram, const int m_width, const int m_height, const int histogramBin)
 {
   const int countCol = m_width;
-  const int step = FloatToInt((float)histogramBin / countCol);
-  int width = FloatToInt((float)m_width / countCol);
+  const int step = histogramBin / countCol + 0.5f;
+  int width = m_width / countCol + 0.5f;
   if (width < 1) width = 1;
 
   float height;
@@ -963,6 +1504,7 @@ void ViewHistorgam(float4 data[], float3* histogram, const int m_width, const in
   }
 
 }
+
 void MinMaxHistBin(const float* histogram, float& minHistBin, float& maxHistBin, const int sizeImage, const int histogramBin)
 {
   int i = 0;
@@ -985,12 +1527,14 @@ void MinMaxHistBin(const float* histogram, float& minHistBin, float& maxHistBin,
   minHistBin /= histogramBin;
   maxHistBin /= histogramBin;
 }
+
 float Min3(const float value1, const float value2, const float value3)
 {
   if (value1 <= value2 && value1 <= value3) return value1;
   else if (value2 <= value1 && value1 <= value3) return value2;
   else                                           return value3;
 }
+
 float Max3(const float value1, const float value2, const float value3)
 {
   if (value1 >= value2 && value1 >= value3) return value1;
@@ -998,72 +1542,70 @@ float Max3(const float value1, const float value2, const float value3)
   else                                           return value3;
 
 }
-void Resize(float inData[], const float sourceWidth, const float sourceHeight, const float sourceSizeImage, const float resize)
-{
-  const int newSizeImage = FloatToInt(sourceSizeImage * resize);
-  const int newHeight = FloatToInt(sourceHeight * resize);
-  const int newWidth = FloatToInt(sourceWidth * resize);
 
+int FloatToInt(const float inData)
+{
+  return int(inData + 0.5f);
+}
+
+void Resize(float data[], const float sourceWidth, const float sourceHeight, const float sourceSizeImage, const float resize)
+{
+  // Resize works correctly only if the resize is a multiple of 2.
+  const int newSizeImage = sourceSizeImage * (resize * resize);
+  const int newHeight = sourceHeight * resize;
+  const int newWidth = sourceWidth * resize;
+
+  float* resizeArray = (float*)calloc(newSizeImage, sizeof(float));
+
+  // Downsample
   if (resize < 1.0f)
   {
+#pragma omp parallel for
     for (int y = 0; y < newHeight; ++y)
     {
       for (int x = 0; x < newWidth; ++x)
       {
-        const int i = FloatToInt(y * sourceWidth + x);
-        int j = FloatToInt(y / resize * sourceWidth + x / resize);
-        if (j >= sourceSizeImage) j = FloatToInt(sourceSizeImage - 1);
-        inData[i] = inData[j];
+        const int i = y * newWidth + x;
+        const int j = (int)(y / resize) * sourceWidth + x / resize;
+        if (j >= sourceSizeImage) continue;
+        resizeArray[i] = data[j];
+      }
+    }
+
+#pragma omp parallel for
+    for (int y = 0; y < newHeight; ++y)
+    {
+      for (int x = 0; x < newWidth; ++x)
+      {
+        const int i = y * sourceWidth + x;
+        const int j = y * newWidth + x;
+
+        data[i] = resizeArray[j];
       }
     }
   }
-  else
+  else // Upsample
   {
-    float* resizeArray = (float*)calloc(newSizeImage, sizeof(float));
-
+#pragma omp parallel for
     for (int y = 0; y < newHeight; ++y)
     {
       for (int x = 0; x < newWidth; ++x)
       {
-        const int i = (y * newWidth) + x;
-        const int j = FloatToInt((y / resize ) * newWidth + x / resize);
-        resizeArray[i] = inData[j];
+        const int i = y * newWidth + x;
+        const int j = (int)(y / resize) * newWidth + x / resize;
+        resizeArray[i] = data[j];
       }
     }
 
-
+#pragma omp parallel for
     for (int i = 0; i < newSizeImage; ++i)
-      inData[i] = resizeArray[i];
-
-    free(resizeArray);
-    resizeArray = NULL;
-  }
-}
-std::vector<float> createGaussKernelWeights1D_HDRImage2(const int size, const float a_sigma)
-{
-  std::vector<float> gKernel(size);
-
-  // set standard deviation to 1.0
-  const float sigma = a_sigma;
-  const float s = 2.0f * sigma * sigma;
-
-  // sum is for normalization
-  float sum = 0.0;
-  const int halfSize = size / 2;
-
-  for (int x = -halfSize; x <= halfSize; ++x)
-  {
-    int index = x + halfSize;
-    gKernel[index] = (exp(-abs(x) / s)) / (3.141592654f * s);
-    sum += gKernel[index];
+      data[i] = resizeArray[i];
   }
 
-  // normalize the Kernel
-  for (int i = 0; i < size; ++i)
-    gKernel[i] /= sum;
-
-  return gKernel;
+  free(resizeArray);
+  resizeArray = nullptr;
 }
+
 void Sharp(float4 image4out[], const float lumForSharp[], const float a_sharpness, const int a_width, const int a_height)
 {
 #pragma omp parallel for
@@ -1129,82 +1671,113 @@ void Sharp(float4 image4out[], const float lumForSharp[], const float a_sharpnes
     }
   }
 }
-void Blur(float inData[], int blurRadius, const int m_width, const int m_height, const int sizeImage)
+
+std::vector<float> createGaussKernelWeights1D_HDRImage2(const int blurRadius)
 {
-  const float diagonalImage = Distance(0, 0, (float)m_width, (float)m_height);
+  std::vector<float> gKernel(blurRadius);
+
+  // sum is for normalization
+  float sum = 0.0f;
+
+  for (int x = 0; x < blurRadius; ++x)
+  {
+    gKernel[x] = exp(-x * x / ((blurRadius * blurRadius) / 6.28318530f));
+    sum += gKernel[x];
+  }
+
+  // normalize the Kernel
+  for (int i = 0; i < blurRadius; ++i)
+    gKernel[i] /= (2.0f * sum);
+
+  return gKernel;
+}
+
+void Blur(float data[], int blurRadius, const int m_width, const int m_height, const int sizeImage)
+{
+  const float diagonalImage = Distance(0, 0, m_width, m_height);
   float radiusImage = diagonalImage / 2.0f;
 
+  // Resize works correctly only if the resize is a multiple of 2.
   float resize = 1.0f;
-  if (blurRadius >= (radiusImage / 2.0f)) resize = 0.50f;
-  else if (blurRadius >= radiusImage)         resize = 0.25f;
+  if (blurRadius >= (radiusImage / 4.0f)) resize = 0.5f;
+  else if (blurRadius >= (radiusImage / 2.0f)) resize = 0.25f;
+  blurRadius *= resize;
 
-  blurRadius = FloatToInt(blurRadius * resize);
-  const int colInRadius = FloatToInt((blurRadius + blurRadius + 1) / 2.0f);
+  const int resizeWidth = m_width * resize;
+  const int resizeHeight = m_height * resize;
+  const int resizeSizeImage = sizeImage * (resize * resize);
+  float* blurPass = (float*)calloc(resizeSizeImage, sizeof(float));
+  std::vector<float> weights = createGaussKernelWeights1D_HDRImage2(blurRadius + 1);
 
-  const int smallSizeImage = FloatToInt(sizeImage * resize);
-  const int smallHeight = FloatToInt(m_height * resize);
-  const int smallWidth = FloatToInt(m_width * resize);
-  float* blurRow = (float*)calloc(FloatToInt(sizeImage * resize), sizeof(float));
-  float* blurRowCol = (float*)calloc(FloatToInt(sizeImage * resize), sizeof(float));
-  std::vector<float> weights = createGaussKernelWeights1D_HDRImage2(blurRadius * 2 + 1, 1.0f);
+  // Downsize for speed up blur
+  if (resize < 1.0f) Resize(data, m_width, m_height, sizeImage, resize);
 
-  // Downsize for up speed blur
-  if (resize < 1.0f) Resize(inData, (float)m_width, (float)m_height, (float)sizeImage, resize);
+  //------------ Blur ------------
 
-  // ----- Blur -----
+  float summ;
+  float multRadius = 1.0f;
+  if (blurRadius >= resizeWidth)
+    multRadius = (float)(resizeWidth - 1) / blurRadius;
 
   // All row.  
-  #pragma omp parallel for
-  for (int y = 0; y < smallHeight; ++y)
+
+// cannot be parallelize.
+  for (int y = 0; y < resizeHeight; ++y)
   {
-    for (int x = 0; x < smallWidth; ++x)
+    for (int x = 0; x < resizeWidth; ++x)
     {
-      float summ = 0;
+      summ = 0.0f;
 
       for (int row = -blurRadius; row <= blurRadius; ++row)
       {
         int currX = x + row;
-        if (currX < 0)            currX = 0;
-        else if (currX >= smallWidth)  currX = smallWidth - 1;
-        summ += inData[y * m_width + currX] * weights[row + blurRadius];
+        if (currX < 0)            currX = 0 + abs(row) * multRadius;
+        else if (currX >= resizeWidth) currX = resizeWidth - abs(row) * multRadius;
+
+        summ += data[y * m_width + currX] * weights[abs(row)];
       }
-      blurRow[y * m_width + x] = summ;
+      blurPass[y * resizeWidth + x] = summ;
     }
   }
 
   // All col.
-  #pragma omp parallel for
-  for (int x = 0; x < smallWidth; ++x)
+
+  multRadius = 1.0f;
+  if (blurRadius >= resizeHeight)
+    multRadius = (float)(resizeHeight - 1) / blurRadius;
+
+#pragma omp parallel for
+  for (int x = 0; x < resizeWidth; ++x)
   {
-    for (int y = 0; y < smallHeight; ++y)
+    for (int y = 0; y < resizeHeight; ++y)
     {
-      float summ = 0;
+      summ = 0.0f;
 
       for (int col = -blurRadius; col <= blurRadius; ++col)
       {
         int currY = y + col;
-        if (currY < 0)            currY = 0;
-        else if (currY >= smallHeight) currY = smallHeight - 1;
-        summ += blurRow[currY * m_width + x] * weights[col + blurRadius];
+        if (currY < 0)             currY = 0 + abs(col) * multRadius;
+        else if (currY >= resizeHeight) currY = resizeHeight - abs(col) * multRadius;
+
+        summ += blurPass[currY * resizeWidth + x] * weights[abs(col)];
       }
-      inData[y * m_width + x] = summ;
+      data[y * m_width + x] = summ;
     }
   }
 
   // Upsize
   resize = 1.0f / resize;
-  if (resize > 1.0f) Resize(inData, m_width / resize, m_height / resize, sizeImage / resize, resize);
+  if (resize > 1.0f) Resize(data, resizeWidth, resizeHeight, resizeSizeImage, resize);
 
-  free(blurRow);
-  free(blurRowCol);
-  blurRow = NULL;
-  blurRowCol = NULL;
+  free(blurPass);
+  blurPass = nullptr;
 }
+
+
 float ConvertAngleToRad(int angle)
 {
   return angle * 0.01745329252f;
 }
-
 void DiffractionStars(float4* inData, float3 diffrStars[], const float a_sizeStar, const int a_numRay, const int a_RotateRay, const float a_randomAngle,
   const float a_sprayRay, const int m_width, const int m_height, const int sizeImage, const float radiusImage, const int x, const int y, const int i)
 {
@@ -1253,6 +1826,7 @@ void DiffractionStars(float4* inData, float3 diffrStars[], const float a_sizeSta
       if (newX > 0 && newX < m_width && newY > 0 && newY < m_height)
       {
         const float I = pow((sinf(u) / u), 2) * multDist;
+
         const float3 color = { inData[i].x * I, inData[i].y * I ,inData[i].z * I };
 
         Bilinear3(color, diffrStars, newX, newY, m_width, m_height, sizeImage);
@@ -1260,3 +1834,102 @@ void DiffractionStars(float4* inData, float3 diffrStars[], const float a_sizeSta
     }
   }
 }
+
+void UniformContrastRGBFilter(float4 image4out[], const int sizeImage, const int histogramBin, const float amount)
+{
+  std::vector<float> rgbArray(sizeImage * 3);
+
+  // Convert 3 field RGB to linear array.
+#pragma omp parallel for
+  for (int i = 0; i < sizeImage; ++i)
+  {
+    rgbArray[i] = image4out[i].x;
+    rgbArray[sizeImage + i] = image4out[i].y;
+    rgbArray[sizeImage * 2 + i] = image4out[i].z;
+  }
+
+  UniformContrastRgb(&rgbArray[0], sizeImage, histogramBin);
+
+  // Return to main array
+#pragma omp parallel for
+  for (int i = 0; i < sizeImage; ++i)
+  {
+    const float meanRGBsource = (image4out[i].x + image4out[i].y + image4out[i].z) / 3.0f;
+    const float meanRGB_UC = (rgbArray[i] + rgbArray[i + sizeImage] + rgbArray[i + sizeImage * 2]) / 3.0f;
+
+    float diff = meanRGB_UC / (meanRGBsource + 0.0001f);
+    float3 rgbDiff;
+    rgbDiff.x = image4out[i].x;
+    rgbDiff.y = image4out[i].y;
+    rgbDiff.z = image4out[i].z;
+
+    Blend(rgbDiff.x, image4out[i].x * diff, amount);
+    Blend(rgbDiff.y, image4out[i].y * diff, amount);
+    Blend(rgbDiff.z, image4out[i].z * diff, amount);
+
+    Blend(image4out[i].x, rgbArray[i], amount);
+    Blend(image4out[i].y, rgbArray[i + sizeImage], amount);
+    Blend(image4out[i].z, rgbArray[i + sizeImage * 2], amount);
+
+    Blend(image4out[i].x, rgbDiff.x, 0.5f);
+    Blend(image4out[i].y, rgbDiff.y, 0.5f);
+    Blend(image4out[i].z, rgbDiff.z, 0.5f);
+  }
+}
+
+void NormalizeFilter(float4 image4out[], float3 histogram[], const int sizeImage, const int histogramBin, float3& minHistBin,
+  float3& maxHistBin, float& minAllHistBin, float& maxAllHistBin, const float amount)
+{
+#pragma omp parallel for
+  for (int i = 0; i < sizeImage; ++i)
+  {
+    CalculateHistogram(image4out[i].x, &histogram[0].x, histogramBin);
+    CalculateHistogram(image4out[i].y, &histogram[0].y, histogramBin);
+    CalculateHistogram(image4out[i].z, &histogram[0].z, histogramBin);
+  }
+
+  // Calculate min/max histogram for a_normalize
+  MinMaxHistBin(&histogram[0].x, minHistBin.x, maxHistBin.x, sizeImage, histogramBin);
+  MinMaxHistBin(&histogram[0].y, minHistBin.y, maxHistBin.y, sizeImage, histogramBin);
+  MinMaxHistBin(&histogram[0].z, minHistBin.z, maxHistBin.z, sizeImage, histogramBin);
+
+  minAllHistBin = Min3(minHistBin.x, minHistBin.y, minHistBin.z);
+  maxAllHistBin = Max3(maxHistBin.x, maxHistBin.y, maxHistBin.z);
+
+  // Normalize 
+#pragma omp parallel for
+  for (int i = 0; i < sizeImage; ++i)
+  {
+    float3 dataNorm;
+    dataNorm.x = image4out[i].x;
+    dataNorm.y = image4out[i].y;
+    dataNorm.z = image4out[i].z;
+
+    Normalize(dataNorm.x, minAllHistBin, maxAllHistBin, 0.0f, 1.0f);
+    Normalize(dataNorm.y, minAllHistBin, maxAllHistBin, 0.0f, 1.0f);
+    Normalize(dataNorm.z, minAllHistBin, maxAllHistBin, 0.0f, 1.0f);
+
+    Blend(image4out[i].x, dataNorm.x, amount);
+    Blend(image4out[i].y, dataNorm.y, amount);
+    Blend(image4out[i].z, dataNorm.z, amount);
+  }
+}
+
+void ViewHistorgamFilter(float4 image4out[], float3 histogram[], const int sizeImage, const int histogramBin, const int a_width,
+  const int a_height)
+{
+#pragma omp parallel for
+  for (int i = 0; i < sizeImage; ++i)
+  {
+    CalculateHistogram(image4out[i].x, &histogram[0].x, histogramBin);
+    CalculateHistogram(image4out[i].y, &histogram[0].y, histogramBin);
+    CalculateHistogram(image4out[i].z, &histogram[0].z, histogramBin);
+  }
+
+  NormalizeHistogram(&histogram[0].x, histogramBin);
+  NormalizeHistogram(&histogram[0].y, histogramBin);
+  NormalizeHistogram(&histogram[0].z, histogramBin);
+
+  ViewHistorgam(image4out, &histogram[0], a_width, a_height, histogramBin);
+}
+
