@@ -528,12 +528,13 @@ void OffsetCenter(float& data, const float inMin, const float inMax, const float
 
   Normalize(data, 0, 1, inMin, inMax);  
 }
-void ContrastField(float& data)
+void ContrastField(float& data, const float amount)
 {
   if (data > 0.0f && data < 1.0f)
   {
     const float a = data * 1.5707f;
-    data = sin(a) * sin(a);
+    const float outData = sin(a) * sin(a);
+    Blend(data, outData, amount);
   }
 }
 void Compress(float& data, const float maxRgb)

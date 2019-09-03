@@ -454,23 +454,39 @@ void ExecutePostProcessHydra1(
     // ----- Contrast -----
     if (a_contrast > 1.0f)
     {
-      float4 contrastData = image4out[i];
+      //RGB
+      float4 contrRGB = image4out[i];
+      contrRGB.x = pow(contrRGB.x, 1.0f / 2.2f);
+      contrRGB.y = pow(contrRGB.y, 1.0f / 2.2f);
+      contrRGB.z = pow(contrRGB.z, 1.0f / 2.2f);
+      ContrastField(contrRGB.x, a_contrast - 1.0f);
+      ContrastField(contrRGB.y, a_contrast - 1.0f);
+      ContrastField(contrRGB.z, a_contrast - 1.0f);
+      contrRGB.x = pow(contrRGB.x, 2.2f);
+      contrRGB.y = pow(contrRGB.y, 2.2f);
+      contrRGB.z = pow(contrRGB.z, 2.2f);
 
-      contrastData.x = pow(contrastData.x, 0.4545f);
-      contrastData.y = pow(contrastData.y, 0.4545f);
-      contrastData.z = pow(contrastData.z, 0.4545f);
-      ContrastField(contrastData.x);
-      ContrastField(contrastData.y);
-      ContrastField(contrastData.z);
-      contrastData.x = pow(contrastData.x, 2.2f);
-      contrastData.y = pow(contrastData.y, 2.2f);
-      contrastData.z = pow(contrastData.z, 2.2f);
+      //IPT
+      ConvertSrgbToXyz(&image4out[i]);
+      ConvertXyzToLmsPower(&image4out[i], 0.43f);
+      ConvertLmsToIpt(&image4out[i]);
 
-      // Return to main array
-      const float mix = a_contrast - 1.0f;
-      Blend(image4out[i].x, contrastData.x, mix);
-      Blend(image4out[i].y, contrastData.y, mix);
-      Blend(image4out[i].z, contrastData.z, mix);
+      float lumContr = image4out[i].x;
+      ContrastField(lumContr, a_contrast - 1.0f);
+
+      const float multColor = 1.0f + abs(image4out[i].x - lumContr);
+      image4out[i].y *= multColor;
+      image4out[i].z *= multColor;
+      image4out[i].x = lumContr;
+
+      ConvertIptToLms(&image4out[i]);
+      ConvertLmsToXyzPower(&image4out[i]);
+      ConvertXyzToSrgb(&image4out[i]);
+
+      // Blend RGB and IPT 50x50%
+      Blend(image4out[i].x, contrRGB.x, 0.5f);
+      Blend(image4out[i].y, contrRGB.y, 0.5f);
+      Blend(image4out[i].z, contrRGB.z, 0.5f);
     }
   }
   
