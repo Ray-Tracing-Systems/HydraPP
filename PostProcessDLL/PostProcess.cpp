@@ -56,33 +56,34 @@ bool PostProcessHydra1::Eval()
   //
   unsigned int numThreads = settings.attribute(L"numThreads").as_int();
 
-  float exposure = settings.attribute(L"exposure").as_float();
-  float compress = settings.attribute(L"compress").as_float();
-  float contrast = settings.attribute(L"contrast").as_float();
-  float saturation = settings.attribute(L"saturation").as_float();
-  float whiteBalance = settings.attribute(L"whiteBalance").as_float();
-  float3 whitePointColor = HydraXMLHelpers::ReadFloat3(settings.attribute(L"whitePointColor"));
-  float uniformContrast = settings.attribute(L"uniformContrast").as_float();
-  float normalize = settings.attribute(L"normalize").as_float();
-  float vignette = settings.attribute(L"vignette").as_float();
-  float chromAberr = settings.attribute(L"chromAberr").as_float();
-  float sharpness = settings.attribute(L"sharpness").as_float();
+  float exposure          = settings.attribute(L"exposure").as_float();
+  float compress          = settings.attribute(L"compress").as_float();
+  float contrast          = settings.attribute(L"contrast").as_float();
+  float saturation        = settings.attribute(L"saturation").as_float();
+  float whiteBalance      = settings.attribute(L"whiteBalance").as_float();
+  float3 whitePointColor  = HydraXMLHelpers::ReadFloat3(settings.attribute(L"whitePointColor"));
+  float uniformContrast   = settings.attribute(L"uniformContrast").as_float();
+  float normalize         = settings.attribute(L"normalize").as_float();
+  float vignette          = settings.attribute(L"vignette").as_float();
+  float chromAberr        = settings.attribute(L"chromAberr").as_float();
+  float sharpness         = settings.attribute(L"sharpness").as_float();
 
   // Diffraction stars
-  float sizeStar    = settings.attribute(L"diffStars_sizeStar").as_float(); // 0-100
-  int   numRay      = settings.attribute(L"diffStars_numRay").as_int();  // 0-16
-  int   rotateRay   = settings.attribute(L"diffStars_rotateRay").as_int();  // 0-360
-  float randomAngle = settings.attribute(L"diffStars_randomAngle").as_float();   // 0-1
-  float sprayRay    = settings.attribute(L"diffStars_sprayRay").as_float();   // 0-1 
+  float sizeStar          = settings.attribute(L"diffStars_sizeStar").as_float(); // 0-100
+  int   numRay            = settings.attribute(L"diffStars_numRay").as_int();  // 0-16
+  int   rotateRay         = settings.attribute(L"diffStars_rotateRay").as_int();  // 0-360
+  float randomAngle       = settings.attribute(L"diffStars_randomAngle").as_float();   // 0-1
+  float sprayRay          = settings.attribute(L"diffStars_sprayRay").as_float();   // 0-1 
 
   int w1, h1, bpp1;
   int w2, h2, bpp2;
-  const float* input = GetInputByName(L"in_color", &w1, &h1, &bpp1);
-  float* output = GetOutputByName(L"out_color", &w2, &h2, &bpp2);
+
+  const float* input      = GetInputByName(L"in_color"  , &w1, &h1, &bpp1);
+  float*       output     = GetOutputByName(L"out_color", &w2, &h2, &bpp2);
 
   // check we have correct in and out arguments
   //
-  if (numThreads < 0 || exposure < 0.0f || compress < 0.0f || contrast < 0.0f ||
+  if (exposure < 0.0f || compress < 0.0f || contrast < 0.0f ||
     saturation < 0.0f || whiteBalance < 0.0f || whitePointColor.x < 0.0f || 
     whitePointColor.y < 0.0f || whitePointColor.z < 0.0f || uniformContrast < 0.0f || 
     normalize < 0.0f || vignette < 0.0f || chromAberr < 0.0f || sharpness < 0.0f ||
@@ -179,7 +180,7 @@ bool PostProcessHydra1::Eval()
     wcsncpy_s(m_msg, L"post_process_hydra1; bad input size", ERR_MSG_SIZE);
     return false;
   }
-  if (bpp1 != bpp1 || bpp1 != 16)
+  if (bpp1 != bpp2 || bpp1 != 16)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; ivalid image format; both images must be HDR;", ERR_MSG_SIZE);
     return false;
@@ -241,7 +242,6 @@ void ExecutePostProcessHydra1(
   const float radiusImage = diagonalImage / 2.0f;
 
   const int histogramBin = 10000;
-  const float iterrHistogramBin = 1.0f;
 
   bool autoWhiteBalance = true;
   if (a_whitePointColor.x > 0.0f || a_whitePointColor.y > 0.0f || a_whitePointColor.z > 0.0f)
@@ -249,17 +249,10 @@ void ExecutePostProcessHydra1(
     autoWhiteBalance = false;
   }
   float3 summRgb = { 0.0f, 0.0f, 0.0f };
-  float3 summRgbColorPass = { 0.0f, 0.0f, 0.0f };
-  float3 whitePointColorPass = { 1.0f, 1.0f, 1.0f };
   float3 d65 = { 0.9505f , 1.0f, 1.0888f }; // in XYZ
 
-  float  coefOffsetHue = 0.0f;
   float  minRgbSource = 10000.0f;
   float  maxRgbSource = 0.0f;
-  float  minRgbFinish = 10000.0f;
-  float  maxRgbFinish = 0.0f;
-  float  minRgbSourceBlur = 10000.0f;
-  float  maxRgbSourceBlur = 0.0f;
 
   float  minAllHistBin = 0.0f;
   float  maxAllHistBin = 1.0f;
@@ -267,29 +260,27 @@ void ExecutePostProcessHydra1(
   float3 maxHistBin(histogramBin, histogramBin, histogramBin);
 
   // arrays
-  float* bigBlurPass = nullptr;
   float* chromAbberR = nullptr;
   float* chromAbberG = nullptr;
   float* lumForSharp = nullptr;
-  float* noiseStruct = nullptr;
   float3* diffrStars = nullptr;
   float3* histogram = nullptr;
 
 
   if (a_chromAberr > 0.0f)
   {
-    chromAbberR = (float*)calloc(sizeImage, sizeof(float));
-    chromAbberG = (float*)calloc(sizeImage, sizeof(float));
+    chromAbberR = new float[sizeImage]; 
+    chromAbberG = new float[sizeImage]; 
   }
 
   if (a_normalize > 0.0f)
-    histogram = (float3*)calloc(histogramBin, sizeof(float3));
+    histogram = new float3[histogramBin]; 
 
   if (a_sharpness > 0.0f)
-    lumForSharp = (float*)calloc(sizeImage, sizeof(float));
+    lumForSharp = new float[sizeImage];
 
   if (a_sizeStar > 0.0f)
-    diffrStars = (float3*)calloc(sizeImage, sizeof(float3));
+    diffrStars = new float3[sizeImage];
 
 
   //////////////////////////////////////////////////////////////////////////////////////
@@ -506,26 +497,18 @@ void ExecutePostProcessHydra1(
 
   if (a_chromAberr > 0.0f)
   {
-    free(chromAbberR);
-    free(chromAbberG);
-    chromAbberR = nullptr;
-    chromAbberG = nullptr;
+    delete[] chromAbberR;
+    delete[] chromAbberG;
   }
-  if (a_sharpness > 0.0f)
-  {
-    free(lumForSharp);
-    lumForSharp = nullptr;
-  }
-  if (a_sizeStar > 0.0f)
-  {
-    free(diffrStars);
-    diffrStars = nullptr;
-  }
+
+  if (a_sharpness > 0.0f) 
+    delete[] lumForSharp;
+
+  if (a_sizeStar > 0.0f)  
+    delete[] diffrStars;
+      
   if (a_normalize > 0.0f )
-  {
-    free(histogram);
-    histogram = nullptr;
-  }
+    delete[] histogram;  
 }
 
 

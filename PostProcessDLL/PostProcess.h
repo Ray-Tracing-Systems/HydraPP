@@ -95,13 +95,16 @@ void ConvertRgbToHsv(float4* data)
   rgb_min = MIN3(r, g, b);
   rgb_max = MAX3(r, g, b);
 
-  if (rgb_max == r) {
+  if (rgb_max == r)
+  {
     H = 0.0f + 60.0f*(g - b);
   }
-  else if (rgb_max == g) {
+  else if (rgb_max == g)
+  {
     H = 120.0f + 60.0f*(b - r);
   }
-  else /* rgb_max == *b */ {
+  else /* rgb_max == *b */
+  {
     H = 240.0f + 60.0f*(r - g);
   }
 
@@ -159,16 +162,6 @@ void ConvertSrgbToXyz(float4* data)
   data->y = R * 0.2126729f + G * 0.7151522f + B * 0.0721750f;
   data->z = R * 0.0193339f + G * 0.1191920f + B * 0.9503041f;
 }
-void ConvertSrgbToXyzIcam06(float4* data)
-{
-  const float R = data->x;
-  const float G = data->y;
-  const float B = data->z;
-
-  data->x = R * 0.412424f + G * 0.2126560f + B * 0.0193324f;
-  data->y = R * 0.357579f + G * 0.7151580f + B * 0.1191900f;
-  data->z = R * 0.180464f + G * 0.0721856f + B * 0.9504440f;
-}
 void ConvertXyz65ToRgb(float4* data)
 {
   float var_X = data->x / 100.0f;  //X from 0 to  95.047      (Observer = 2°, Illuminant = D65)
@@ -201,16 +194,6 @@ void ConvertXyzToSrgb(float4* data)
   data->x = X * 3.2404542f + Y * -1.5371385f + Z * -0.4985314f;
   data->y = X * -0.9692660f + Y * 1.8760108f + Z * 0.0415560f;
   data->z = X * 0.0556434f + Y * -0.2040259f + Z * 1.0572252f;
-}
-void ConvertXyzToSrgbIcam06(float4* data)
-{
-  const float X = data->x;
-  const float Y = data->y;
-  const float Z = data->z;
-
-  data->x = X * 3.2407f + Y * -0.9693f + Z * 0.0556f;
-  data->y = X * -1.5373f + Y * 1.8760f + Z * -0.2040f;
-  data->z = X * -0.4986f + Y * 0.0416f + Z * 1.0571f;
 }
 void ConvertXyzToLab(float3* data)
 {
@@ -246,54 +229,6 @@ void ConvertXyzToLab(float4* data)
   data->y = 500.0f * (var_X - var_Y); // CIE-a
   data->z = 200.0f * (var_Y - var_Z); // CIE-b
 }
-void ConvertXyzToZlab(float4* data, const float3 whitePoint, const float a_whiteBalance)
-{
-  const float X = data->x;
-  const float Y = data->y;
-  const float Z = data->z;
-
-  const float Xw = whitePoint.x;
-  const float Yw = whitePoint.y;
-  const float Zw = whitePoint.z;
-
-  // ----- chromatic adaptation -----
-
-  // convert to sharpened cone responses using Бредфорский расчёт. 
-
-  const float R = 0.8951f * (X / Y) + 0.2664f * (Y / Y) + -0.1614f * (Z / Y);
-  const float G = -0.7502f * (X / Y) + 1.7135f * (Y / Y) + 0.0367f * (Z / Y);
-  const float B = 0.0389f * (X / Y) + -0.0685f * (Y / Y) + 1.0296f * (Z / Y);
-
-  const float Rw = 0.8951f * (Xw / Yw) + 0.2664f * (Yw / Yw) + -0.1614f * (Zw / Yw);
-  const float Gw = -0.7502f * (Xw / Yw) + 1.7135f * (Yw / Yw) + 0.0367f * (Zw / Yw);
-  const float Bw = 0.0389f * (Xw / Yw) + -0.0685f * (Yw / Yw) + 1.0296f * (Zw / Yw);
-
-  const float p = pow(Bw, 0.0834f);
-  const float D = a_whiteBalance;
-
-  const float Rc = (D * (1.0f / Rw) + 1.0f - D) * R;
-  const float Gc = (D * (1.0f / Gw) + 1.0f - D) * G;
-  float       Bc = (D * (1.0f / pow(Bw, p)) + 1.0f - D) * pow(abs(B), p);
-
-  if (B < 0.0f) Bc = -abs(B);
-
-  // Back all to XYZ with inverse M matrix
-
-  const float Xc = 0.9871f * Rc * Y + -0.1469f * Gc * Y + 0.1597f * Bc * Y;
-  const float Yc = 0.4324f * Rc * Y + 0.5184f * Gc * Y + 0.0491f * Bc * Y;
-  const float Zc = -0.0083f * Rc * Y + 0.0402f * Gc * Y + 0.9687f * Bc * Y;
-
-  // ----- Appearance Correlates -----
-
-
-  const float Lz = 100.0f *  pow(Yc / 100.0f, 0.50025f);
-  const float Az = 500.0f * (pow(Xc / 100.0f, 0.345f) - pow(Yc / 100.0f, 0.345f));
-  const float Bz = 200.0f * (pow(Yc / 100.0f, 0.345f) - pow(Zc / 100.0f, 0.345f));
-
-  data->x = Lz;
-  data->y = Az;
-  data->z = Bz;
-}
 void ConvertHsvToRgb(float4* data)
 {
   float h = data->x;
@@ -324,64 +259,42 @@ void ConvertHsvToRgb(float4* data)
 
   switch (i)
   {
-  case 0:
-    r = v;
-    g = t;
-    b = p;
-    break;
-  case 1:
-    r = q;
-    g = v;
-    b = p;
-    break;
-  case 2:
-    r = p;
-    g = v;
-    b = t;
-    break;
-  case 3:
-    r = p;
-    g = q;
-    b = v;
-    break;
-  case 4:
-    r = t;
-    g = p;
-    b = v;
-    break;
-  case 5:
-  default:
-    r = v;
-    g = p;
-    b = q;
-    break;
+    case 0:
+      r = v;
+      g = t;
+      b = p;
+      break;
+    case 1:
+      r = q;
+      g = v;
+      b = p;
+      break;
+    case 2:
+      r = p;
+      g = v;
+      b = t;
+      break;
+    case 3:
+      r = p;
+      g = q;
+      b = v;
+      break;
+    case 4:
+      r = t;
+      g = p;
+      b = v;
+      break;
+    case 5:
+    default:
+      r = v;
+      g = p;
+      b = q;
+      break;
   }
 
   data->x = r;
   data->y = g;
   data->z = b;
-}
-void ConvertXyzToRlab(float4* data, float power)
-{
-  const float var_X = data->x / 95.0470f;   //Observer= 2°, Illuminant= D65 
-  const float var_Y = data->y / 100.000f;   //
-  const float var_Z = data->z / 108.883f;   //
-
-  const float p = 1.0f / (2.3f * power + 0.001f);
-
-  data->x = 100.0f *  pow(var_Y, p);                   // L
-  data->y = 430.0f * (pow(var_X, p) - pow(var_Y, p));  // a
-  data->z = 170.0f * (pow(var_Y, p) - pow(var_Z, p));  // b
-}
-void ConvertRlabToXyz(float4* data)
-{
-  const float var_Y = pow(data->x / 100.0f, 2.3f);
-  const float var_X = pow(pow(var_Y, 1.0f / 2.3f) + data->y / 430.0f, 2.3f);
-  const float var_Z = pow(pow(var_Y, 1.0f / 2.3f) - data->z / 170.0f, 2.3f);
-
-  data->x = var_X * 95.047f;   // Observer= 2°, Illuminant= D65
-  data->y = var_Y * 100.0f;    //
-  data->z = var_Z * 108.883f;  //
 }
 void ConvertLabToXyz(float4* data)
 {
@@ -403,47 +316,6 @@ void ConvertLabToXyz(float4* data)
   data->x = var_X * 95.047f;   // Observer= 2°, Illuminant= D65
   data->y = var_Y * 100.0f;    //
   data->z = var_Z * 108.883f;  //
-}
-void ConvertZlabToXyz(float4* data, const float3 whitePoint)
-{
-  const float Lz = data->x;
-  const float Az = data->y;
-  const float Bz = data->z;
-
-  const float Rw = whitePoint.x;
-  const float Gw = whitePoint.y;
-  const float Bw = whitePoint.z;
-
-  // ----- Appearance Correlates -----
-
-  const float Yc = pow(Lz, 1.999f);
-  const float Xc = pow(pow(Yc, 0.345f) + Az / 5.0f, 2.8985f);
-  const float Zc = pow(pow(Yc, 0.345f) - Bz / 2.0f, 2.8985f);
-
-  // ----- chromatic adaptation -----
-
-  // M matrix
-
-  const float Rc = 0.8951f * Xc + 0.2664f * Yc + -0.1614f * Zc;
-  const float Gc = -0.7502f * Xc + 1.7135f * Yc + 0.0367f * Zc;
-  const float Bc = 0.0389f * Xc + -0.0685f * Yc + 1.0296f * Zc;
-
-  const float D = 0.0f;
-  const float p = pow(Bw, 0.0834f);
-
-  const float R = Rc / (D * (1.0f / Rw) + 1.0f - D);
-  const float G = Gc / (D * (1.0f / Gw) + 1.0f - D);
-  const float B = pow(abs(Bc / (D * (1.0f / pow(Bw, p)) + 1.0f - D)), 1 / p);
-
-  // inverse M matrix
-
-  const float X = 0.9871f * R + -0.1469f * G + 0.1597f * B;
-  const float Y = 0.4324f * R + 0.5184f * G + 0.0491f * B;
-  const float Z = -0.0083f * R + 0.0402f * G + 0.9687f * B;
-
-  data->x = Xc * 100.0f;
-  data->y = Yc * 100.0f;
-  data->z = Zc * 100.0f;
 }
 void MatrixCat02(float3* data)
 {
@@ -523,45 +395,6 @@ void ConvertLmsToXyzVonKries(float4* data)
   data->y = 0.3611914f * L + 0.6388125f * M + -0.0000064f * S;
   data->z = 1.0890636f * S;
 }
-void inverseChromAdaptFairchild(float4* data, const float3 whitePoint, const float D)
-{
-  const float Xref = data->x;
-  const float Yref = data->y;
-  const float Zref = data->z;
-
-  const float Ln = whitePoint.x;
-  const float Mn = whitePoint.y;
-  const float Sn = whitePoint.z;
-
-  // inverse R matrix
-
-  const float L = 0.3805f * Xref + 0.7075f * Yref + -0.0881f * Zref;
-  const float M = -0.2150f * Xref + 1.1655f * Yref + 0.0500f * Zref;
-  const float S = Zref;
-
-  // inverse A matrix
-
-  const float Yn = 318.0f; // абсолютная адапт. яркость в cd/m2 (эталон для RLab = 318 cd/m2)
-
-  const float lE = (3.0f * Ln) / (Ln + Mn + Sn);
-  const float mE = (3.0f * Mn) / (Ln + Mn + Sn);
-  const float sE = (3.0f * Sn) / (Ln + Mn + Sn);
-
-  const float pL = (1.0f + pow(Yn, 0.3333f) + lE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / lE);
-  const float pM = (1.0f + pow(Yn, 0.3333f) + mE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / mE);
-  const float pS = (1.0f + pow(Yn, 0.3333f) + sE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / sE);
-
-  const float aL = (pL + D * (1.0f - pL)) / Ln;
-  const float aM = (pM + D * (1.0f - pM)) / Mn;
-  const float aS = (pS + D * (1.0f - pS)) / Sn;
-
-  data->x /= aL;
-  data->y /= aM;
-  data->z /= aS;
-
-  // inverse M matrix
-  InverseMatrixHpe(data);
-}
 void ConvertXyzToLms(float4* data)
 {
   float L = 0.4002f * data->x + 0.7075f * data->y + -0.0807f * data->z;
@@ -599,36 +432,6 @@ void ConvertXyzToLmsPower(float4 * data, const float power)
   data->x = L;
   data->y = M;
   data->z = S;
-}
-void ExponentIcam(float4* data, const float4* dataBlur)
-{
-  float L = data->x;
-  float M = data->y;
-  float S = data->z;
-
-  const float La = 1.0f + dataBlur->y;
-
-  float Fl = 0.2f * pow(1.0f / (5.0f * La + 1.0f), 4.0f) * (5.0f * La) +
-    0.1f * pow(1.0f - pow(1.0f / (5.0f * La + 1.0f), 4.0f), 2.0f) * pow(5.0f * La, 0.3333333f);
-
-  Fl /= 1.7f;
-
-  if (Fl < 0.3f) Fl = 0.3f;
-
-  const float a = 0.43f * Fl;
-
-  if (L >= 0.0f) data->x = pow(L, a);
-  else if (L < 0.0f) data->x = -pow(-L, a);
-
-  if (M >= 0.0f) data->y = pow(M, a);
-  else if (M < 0.0f) data->y = -pow(-M, a);
-
-  if (S >= 0.0f) data->z = pow(S, a);
-  else if (S < 0.0f) data->z = -pow(-S, a);
-
-  //data->x = dataBlur->x;
-  //data->y = dataBlur->y;
-  //data->z = dataBlur->z;
 }
 void ConvertLmsToIpt(float4* data)
 {
@@ -679,54 +482,6 @@ void ConvertIptToLms(float4* data)
   data->y = M;
   data->z = S;
 }
-void ChromAdaptFairchild(float4* data, const float3 whitePoint, const float D)
-{
-  float3 dataW = whitePoint;
-
-  // XYZ input
-  // конверт в колбочки
-  MatrixHpe(data);
-  MatrixHpe(&dataW);
-
-
-  float L = data->x;
-  float M = data->y;
-  float S = data->z;
-
-  const float Ln = dataW.x;
-  const float Mn = dataW.y;
-  const float Sn = dataW.z;
-
-  // A matrix
-
-  const float Yn = 318.0f; // абсолютная адапт. яркость в cd/m2 (эталон для RLab = 318 cd/m2)
-
-  const float lE = (3.0f * Ln) / (Ln + Mn + Sn);
-  const float mE = (3.0f * Mn) / (Ln + Mn + Sn);
-  const float sE = (3.0f * Sn) / (Ln + Mn + Sn);
-
-  const float pL = (1.0f + pow(Yn, 0.3333f) + lE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / lE);
-  const float pM = (1.0f + pow(Yn, 0.3333f) + mE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / mE);
-  const float pS = (1.0f + pow(Yn, 0.3333f) + sE) / (1.0f + pow(Yn, 0.3333f) + 1.0f / sE);
-
-  const float aL = (pL + D * (1.0f - pL)) / Ln;
-  const float aM = (pM + D * (1.0f - pM)) / Mn;
-  const float aS = (pS + D * (1.0f - pS)) / Sn;
-
-  L *= aL;
-  M *= aM;
-  S *= aS;
-
-  // R matrix. (inverse M and A matrix with little correction)
-
-  const float Xref = 1.9569f * L + -1.1882f * M + 0.2313f * S;
-  const float Yref = 0.3612f * L + 0.6388f * M;
-  const float Zref = S;
-
-  data->x = Xref;
-  data->y = Yref;
-  data->z = Zref;
-}
 void ChromAdaptIcam(float4* data, float3 dataW, float3 d65, const float D)
 {
   MatrixCat02(data);
@@ -747,7 +502,7 @@ void ChromAdaptIcam(float4* data, float3 dataW, float3 d65, const float D)
 }
 void InverseChromAdaptIcam(float4* data, const float D)
 {
-  static const float3 xyz_d65 = { 0.9505f, 1.0f, 1.0888f };
+  static const float3 xyz_d65 ={ 0.9505f, 1.0f, 1.0888f };
   static const float Xd65 = 0.8562f * xyz_d65.x + 0.3372f * xyz_d65.y + -0.1934f * xyz_d65.z;
   static const float Yd65 = -0.8360f * xyz_d65.x + 1.8327f * xyz_d65.y + 0.0033f * xyz_d65.z;
   static const float Zd65 = 0.0357f * xyz_d65.x + -0.0469f * xyz_d65.y + 1.0112f * xyz_d65.z;
@@ -767,177 +522,6 @@ void InverseChromAdaptIcam(float4* data, const float D)
   data->x = Xadapt;
   data->y = Yadapt;
   data->z = Zadapt;
-}
-void ChromAdaptCam02(float4* data, const float3 dataW, float D)
-{
-  MatrixCat02(data);
-
-  // D65 offset: 95.047f / 100.0f = 0.95047f
-  // D65 offset: 108.883 / 100.0f = 1.08883f
-  const float Rc = (0.95047f * D / dataW.x + (1.0f - D)) * data->x;
-  const float Gc = (D / dataW.y + (1.0f - D)) * data->y;
-  const float Bc = (1.08883f * D / dataW.z + (1.0f - D)) * data->z;
-
-  data->x = Rc;
-  data->y = Gc;
-  data->z = Bc;
-
-  InverseMatrixCat02(data);
-}
-void InverseChromAdaptCam02(float4* data, const float3* dataW, const float Fl, const float D, const float c)
-{
-  MatrixCat02(data);
-
-  const float Rc = data->x;
-  const float Gc = data->y;
-  const float Bc = data->z;
-
-  const float R = Rc / (100.0f * D / dataW->x + 1.0f - D);
-  const float G = Gc / (100.0f * D / dataW->y + 1.0f - D);
-  const float B = Bc / (100.0f * D / dataW->z + 1.0f - D);
-
-  data->x = R;
-  data->y = G;
-  data->z = B;
-
-  InverseMatrixCat02(data); // Return XYZ
-}
-void OpponentColorCam02(float4* data, const float maxRgbSource, float & La, float & k, float & Fl, const float c, const float z, const float Nbb, const float Aw)
-{
-  MatrixHpe(data);
-
-  const float R1 = data->x;
-  const float G1 = data->y;
-  const float B1 = data->z;
-
-  La = 0.2f * maxRgbSource; // adaptation field's absolute luminance
-  k = 1.0f / (5.0f * La + 1.0f);
-  Fl = 0.2f * pow(k, 4.0f) * (5.0f * La) + 0.1f * pow(1.0f - pow(k, 4.0f), 2.0f) * pow(5.0f * La, 0.333333f);
-
-  float signR = 1.0f;
-  float signG = 1.0f;
-  float signB = 1.0f;
-
-  if (R1 < 0.0f) signR = -signR;
-  if (G1 < 0.0f) signG = -signG;
-  if (B1 < 0.0f) signB = -signB;
-
-  const float R1a = signR * ((400.0f * pow(Fl * abs(R1) / 100.0f, 0.42f)) / (27.13f + pow(Fl * abs(R1) / 100.0f, 0.42f))) + 0.1f;
-  const float G1a = signG * ((400.0f * pow(Fl * abs(G1) / 100.0f, 0.42f)) / (27.13f + pow(Fl * abs(G1) / 100.0f, 0.42f))) + 0.1f;
-  const float B1a = signB * ((400.0f * pow(Fl * abs(B1) / 100.0f, 0.42f)) / (27.13f + pow(Fl * abs(B1) / 100.0f, 0.42f))) + 0.1f;
-
-  const float A = (2.0f * R1a + G1a + B1a / 20.0f - 0.305f) * Nbb; // achromatic response
-
-  const float J = 100.0f * pow(A / Aw, c * z);              // lightness
-  const float a = R1a - 12.0f * G1a / 11.0f + B1a / 11.0f;
-  const float b = (R1a + G1a - 2.0f * B1a) / 9.0f;
-
-  data->x = J;
-  data->y = a;
-  data->z = b;
-}
-void InverseOpponentColorCam02(float4* data, float& Fl, const float c, const float z, const float Nbb, const float Aw)
-{
-  const float J = data->x;
-  const float a = data->y;
-  const float b = data->z;
-
-  const float A = Aw * pow(J / 100.0f, 1.0f / (c * z));
-  const float p2 = A / Nbb + 0.305f;
-
-  const float R1a = 460.0f / 1403.0f * p2 + 451.0f / 1403.0f * a + 288.00f / 1403.0f * b;
-  const float G1a = 460.0f / 1403.0f * p2 - 891.0f / 1403.0f * a + 261.00f / 1403.0f * b;
-  const float B1a = 460.0f / 1403.0f * p2 - 220.0f / 1403.0f * a - 6300.0f / 1403.0f * b;
-
-  float sign = 1.0f;
-
-  if (R1a - 0.1f == 0.0f) sign = 0.0f;
-  if (G1a - 0.1f == 0.0f) sign = 0.0f;
-  if (B1a - 0.1f == 0.0f) sign = 0.0f;
-  if (R1a - 0.1f < 0.0f)  sign = -1.0f;
-  if (G1a - 0.1f < 0.0f)  sign = -1.0f;
-  if (B1a - 0.1f < 0.0f)  sign = -1.0f;
-
-  float R1 = sign * (R1a - 0.1f) * 100.0f / Fl * pow((27.13f * abs(R1a - 0.1f)) / (400.0f - abs(R1a - 0.1f)), 2.380952f); // 2.380952 = 1 / 0.42
-  float G1 = sign * (G1a - 0.1f) * 100.0f / Fl * pow((27.13f * abs(G1a - 0.1f)) / (400.0f - abs(G1a - 0.1f)), 2.380952f);
-  float B1 = sign * (B1a - 0.1f) * 100.0f / Fl * pow((27.13f * abs(B1a - 0.1f)) / (400.0f - abs(B1a - 0.1f)), 2.380952f);
-
-  data->x = R1;
-  data->y = G1;
-  data->z = B1;
-
-  InverseMatrixHpe(data);
-}
-void ToneCompressionIcam(float4 inData[], const float &whiteImage, const float maxRgbSource, const float maxRgbSourceBlur)
-{
-  float4 dataHpe = *inData;
-  MatrixHpe(&dataHpe);
-
-  const float R1 = dataHpe.x;
-  const float G1 = dataHpe.y;
-  const float B1 = dataHpe.z;
-
-  //S is the luminance of each pixel in the chromatic adapted image, i.e., 
-  //the Y image, and Sw is the value of S for the reference white.
-  //By setting Sw to a global scale from the maximum value of the local adapted white point image,
-  //the rod response output is automatically adjusted by the general luminance perception of the scene.
-  // Yw is the luminance of the local adapted white image.
-
-  // cone response
-
-  const float La = 0.2f * whiteImage;
-  const float k = 1.0f / (5.0f * La + 1.0f);
-  const float Fl = 0.2f * pow(k, 4.0f) * (5.0f * La) + 0.1f * pow(1.0f - pow(k, 4.0f), 2.0f) * pow(5.0f * La, 0.333333f);
-
-  // compression
-  const float p = 0.75f; // 0.6 - 0.85
-  const float Yw = maxRgbSource;
-
-  float signR = 1.0f;
-  float signG = 1.0f;
-  float signB = 1.0f;
-
-  if (R1 < 0.0f) signR = -signR;
-  if (G1 < 0.0f) signG = -signG;
-  if (B1 < 0.0f) signB = -signB;
-
-  const float R1a = signR * ((400.0f * pow(Fl * abs(R1) / Yw, p)) / (27.13f + pow(Fl * abs(R1) / Yw, p))) + 0.1f;
-  const float G1a = signG * ((400.0f * pow(Fl * abs(G1) / Yw, p)) / (27.13f + pow(Fl * abs(G1) / Yw, p))) + 0.1f;
-  const float B1a = signB * ((400.0f * pow(Fl * abs(B1) / Yw, p)) / (27.13f + pow(Fl * abs(B1) / Yw, p))) + 0.1f;
-
-  // make a netural As Rod response
-  const float Las = 2.26f * La;
-  const float j = 0.00001f / (5.0f * Las / 2.26f + 0.00001f);
-  const float Fls = 3800.0f * (j * j) * (5.0f * Las / 2.26f) + 0.2f * pow(1.0f - j * j, 4.0f) * pow(5.0f * Las / 2.26f, 1.0f / 6.0f);
-  const float Sw = whiteImage;
-  const float S = inData->y;
-
-  // BS is the rod pigment bleach or satruration factor
-  const float Bs = 0.5f / (1.0f + 0.3f * pow((5.0f * Las / 2.26f) * (S / Sw), 0.3f))
-    + 0.5f / (1.0f + 5.0f *     (5.0f * Las / 2.26f));
-
-  // Noise term in Rod response is 1 / 3 of that in Cone response because Rods are more sensitive
-  const float As = 3.05f * Bs * (400.0f * pow(Fls * S / Sw, p)) / (27.13f + pow(Fls * S / Sw, p)) + 0.3f;
-
-  // combine Cone and Rod response
-  inData->x = R1a + As;
-  inData->y = G1a + As;
-  inData->z = B1a + As;
-
-  InverseMatrixHpe(inData);
-
-
-  // colorfulness adjustment - Hunt effect  in IPT color space       
-  //ConvertXyzToLmsPower(inData, 1.0f);
-  //ConvertLmsToIpt(inData);  
-
-  //const float C = sqrtf(inData->y * inData->y + inData->z * inData->z);
-  //const float multColor = (pow(Fl + 1.0f, 0.2f) * ((1.29f * C * C - 0.27f * C + 0.42f) / (C * C - 0.31f * C + 0.42f)));
-  //inData->y *= multColor;
-  //inData->z *= multColor;
-
-  //ConvertIptToLms(inData);
-  //ConvertLmsToXyzPower(inData);
 }
 
 float3 Mediana(const float4* inData, const int size, const int a_width, const int a_height, const int x, const int y)
@@ -975,7 +559,6 @@ float3 Mediana(const float4* inData, const int size, const int a_width, const in
   const int a2 = size * size / 2.0f + 0.5f;
   return { medianaR[a2], medianaG[a2], medianaB[a2] };
 }
-
 void Mediana(float inData[], const int radius, const int a_width, const int a_height, const int sizeImage)
 {
   std::vector<float> tmpData(sizeImage);
@@ -1017,26 +600,6 @@ void Mediana(float inData[], const int radius, const int a_width, const int a_he
   for (int i = 0; i < sizeImage; ++i)
     inData[i] = tmpData[i];
 }
-
-void FireflyDetects(const float4* image4out, float3* fireflyPixels, const int a_width, const int a_height, const int x, const int y, const int i, const float a_fireflyRemove)
-{
-  fireflyPixels[i] = { 0.0f, 0.0f, 0.0f };
-
-  const float3 mediana = Mediana(image4out, 3, a_width, a_height, x, y);
-
-  const float weight = 110.0f - a_fireflyRemove * 100.0f;
-
-  const float meanRGB = (image4out[i].x + image4out[i].y + image4out[i].z) / 3.0f;
-  const float meanMediana = (mediana.x + mediana.y + mediana.z) / 3.0f * weight;
-
-  if (meanRGB > meanMediana)
-  {
-    fireflyPixels[i].x = mediana.x;
-    fireflyPixels[i].y = mediana.y;
-    fireflyPixels[i].z = mediana.z;
-  }
-}
-
 void Blend(float& inData1, const float& inData2, const float amount) // 0 - data1, 1 - data2
 {
   inData1 = inData1 + (inData2 - inData1) * amount;
@@ -1047,14 +610,12 @@ void Normalize(T& data, const float inMin, const float inMax, const float outMin
 {
   data = (data - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
-
 void OffsetCenter(float& data, const float inMin, const float inMax, const float coef)
 {
   Normalize(data, inMin, inMax, 0, 1);
   data = pow(data, coef);
   Normalize(data, 0, 1, inMin, inMax);
 }
-
 void ContrastField(float& data, const float amount)
 {
   if (data > 0.0f && data < 1.0f)
@@ -1064,12 +625,10 @@ void ContrastField(float& data, const float amount)
     Blend(data, outData, amount);
   }
 }
-
 void Compress(float& data, const float maxRgb)
 {
   data = (data * (1.0f + data / (maxRgb * maxRgb))) / (1.0f + data);
 }
-
 void CalculateHistogram(const float& data, float histogram[], const int histogramBin)
 {
   if (data <= 1.0f)
@@ -1082,7 +641,6 @@ void CalculateHistogram(const float& data, float histogram[], const int histogra
       histogram[currentHistogramBin] += 1.0f;
   }
 }
-
 void UniformHistogram(float histogram[], const int histogramBin)
 {
   // Recalculate histogramm
@@ -1345,8 +903,8 @@ void ClampMinusToZero(float4* data4)
   if (data4->z < 0) data4->z = 0;
 }
 void Vignette(float4* data4, const int m_width, const int m_height, const float a_vignette,
-  const float diagonalImage, const float centerImageX, const float centerImageY,
-  const float radiusImage, const int x, const int y, const int i)
+              const float diagonalImage, const float centerImageX, const float centerImageY,
+              const float radiusImage, const int x, const int y, const int i)
 {
   const float distanceFromCenter = Distance((float)x, (float)y, centerImageX, centerImageY) / radiusImage;
 
@@ -1510,7 +1068,7 @@ void MinMaxHistBin(const float* histogram, float& minHistBin, float& maxHistBin,
   int i = 0;
   const float floor = (float)sizeImage * 0.00001f; // 0.001% from image resolution
 
-  while (histogram[i] <= floor && i < histogramBin)
+  while (i < histogramBin && histogram[i] <= floor)
   {
     minHistBin = (float)i;
     i++;
@@ -1518,7 +1076,7 @@ void MinMaxHistBin(const float* histogram, float& minHistBin, float& maxHistBin,
 
   i = histogramBin - 1;
 
-  while (histogram[i] <= floor && i >= 0)
+  while (i >= 0 && histogram[i] <= floor)
   {
     maxHistBin = (float)i;
     i--;
@@ -1555,7 +1113,7 @@ void Resize(float data[], const float sourceWidth, const float sourceHeight, con
   const int newHeight = sourceHeight * resize;
   const int newWidth = sourceWidth * resize;
 
-  float* resizeArray = (float*)calloc(newSizeImage, sizeof(float));
+  float* resizeArray = new float[newSizeImage];
 
   // Downsample
   if (resize < 1.0f)
@@ -1602,8 +1160,7 @@ void Resize(float data[], const float sourceWidth, const float sourceHeight, con
       data[i] = resizeArray[i];
   }
 
-  free(resizeArray);
-  resizeArray = nullptr;
+  delete[] resizeArray;
 }
 
 void Sharp(float4 image4out[], const float lumForSharp[], const float a_sharpness, const int a_width, const int a_height)
@@ -1703,10 +1260,12 @@ void Blur(float data[], int blurRadius, const int m_width, const int m_height, c
   else if (blurRadius >= (radiusImage / 2.0f)) resize = 0.25f;
   blurRadius *= resize;
 
-  const int resizeWidth = m_width * resize;
-  const int resizeHeight = m_height * resize;
+  const int resizeWidth     = m_width * resize;
+  const int resizeHeight    = m_height * resize;
   const int resizeSizeImage = sizeImage * (resize * resize);
-  float* blurPass = (float*)calloc(resizeSizeImage, sizeof(float));
+
+  float* blurPass = new float[resizeSizeImage];
+
   std::vector<float> weights = createGaussKernelWeights1D_HDRImage2(blurRadius + 1);
 
   // Downsize for speed up blur
@@ -1769,8 +1328,7 @@ void Blur(float data[], int blurRadius, const int m_width, const int m_height, c
   resize = 1.0f / resize;
   if (resize > 1.0f) Resize(data, resizeWidth, resizeHeight, resizeSizeImage, resize);
 
-  free(blurPass);
-  blurPass = nullptr;
+  delete[] blurPass;
 }
 
 
@@ -1779,9 +1337,8 @@ float ConvertAngleToRad(int angle)
   return angle * 0.01745329252f;
 }
 void DiffractionStars(float4* inData, float3 diffrStars[], const float a_sizeStar, const int a_numRay, const int a_RotateRay, const float a_randomAngle,
-  const float a_sprayRay, const int m_width, const int m_height, const int sizeImage, const float radiusImage, const int x, const int y, const int i)
+                      const float a_sprayRay, const int m_width, const int m_height, const int sizeImage, const float radiusImage, const int x, const int y, const int i)
 {
-  const float PI = 3.141592f;
   const float twoPI = 6.283185f;
   const float angle = twoPI / a_numRay;
   const float waveLenghtR = 0.000700f;
@@ -1827,7 +1384,7 @@ void DiffractionStars(float4* inData, float3 diffrStars[], const float a_sizeSta
       {
         const float I = pow((sinf(u) / u), 2) * multDist;
 
-        const float3 color = { inData[i].x * I, inData[i].y * I ,inData[i].z * I };
+        const float3 color ={ inData[i].x * I, inData[i].y * I ,inData[i].z * I };
 
         Bilinear3(color, diffrStars, newX, newY, m_width, m_height, sizeImage);
       }
@@ -1878,7 +1435,7 @@ void UniformContrastRGBFilter(float4 image4out[], const int sizeImage, const int
 }
 
 void NormalizeFilter(float4 image4out[], float3 histogram[], const int sizeImage, const int histogramBin, float3& minHistBin,
-  float3& maxHistBin, float& minAllHistBin, float& maxAllHistBin, const float amount)
+                     float3& maxHistBin, float& minAllHistBin, float& maxAllHistBin, const float amount)
 {
 #pragma omp parallel for
   for (int i = 0; i < sizeImage; ++i)
@@ -1916,7 +1473,7 @@ void NormalizeFilter(float4 image4out[], float3 histogram[], const int sizeImage
 }
 
 void ViewHistorgamFilter(float4 image4out[], float3 histogram[], const int sizeImage, const int histogramBin, const int a_width,
-  const int a_height)
+                         const int a_height)
 {
 #pragma omp parallel for
   for (int i = 0; i < sizeImage; ++i)
