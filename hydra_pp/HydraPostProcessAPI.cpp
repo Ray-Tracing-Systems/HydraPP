@@ -187,7 +187,7 @@ void hrFBISaveToFile(HRFBIRef a_image, const wchar_t* a_fileName, float a_gamma)
   else if (image.pLDRImage != nullptr)
   {
     const unsigned int* idata = (const unsigned int*)image.pLDRImage->data();
-    HydraRender::SaveImageToFile(a_fileName, image.pHDRImage->width(), image.pHDRImage->height(), idata);
+    HydraRender::SaveImageToFile(a_fileName, image.pLDRImage->width(), image.pLDRImage->height(), idata);
   }
   else
   {
