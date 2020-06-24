@@ -18,16 +18,16 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-using HydraLiteMath::float3;
-using HydraLiteMath::float4;
+using LiteMath::float3;
+using LiteMath::float4;
 
-float Luminance(const float3* data)
+float Luminance(float3 data)
 {
-  return (0.2126f * data->x + 0.7152f * data->y + 0.0722f * data->z);
+  return dot(data, float3(0.2126f, 0.7152f, 0.0722f));  
 }
-float Luminance(const float4* data)
+float Luminance(float4 data)
 {
-  return (0.2126f * data->x + 0.7152f * data->y + 0.0722f * data->z);
+  return dot({ data.x, data.y, data.z }, float3(0.2126f, 0.7152f, 0.0722f));
 }
 float Mean(const float4 * data)
 {
@@ -866,10 +866,10 @@ void Bilinear3(const float3 inData, float3 outData[], float newPosX, float newPo
   if (dx < 0.0f) dx = 1.0f - abs(dx);
   if (dy < 0.0f) dy = 1.0f - abs(dy);
 
-  float multBrightness1 = (1.0f - dx) * (1.0f - dy);
-  float multBrightness2 = dx * (1.0f - dy);
-  float multBrightness3 = dy * (1.0f - dx);
-  float multBrightness4 = dx * dy;
+  const float multBrightness1 = (1.0f - dx) * (1.0f - dy);
+  const float multBrightness2 = dx * (1.0f - dy);
+  const float multBrightness3 = dy * (1.0f - dx);
+  const float multBrightness4 = dx * dy;
 
   if (floorY >= 0.0f && floorX >= 0.0f && floorY < m_height - 1 && floorX < m_width - 1)
   {
@@ -962,10 +962,11 @@ void MinMaxRgb(float4* data, float& minRgb, float& maxRgb, const float threshold
 
   if (minRgb < thresholdFloor) minRgb = thresholdFloor;
 
-  if (data[i].x < thresholdFloor) data[i].x = thresholdFloor;
-  if (data[i].y < thresholdFloor) data[i].y = thresholdFloor;
-  if (data[i].z < thresholdFloor) data[i].z = thresholdFloor;
+  if (data[i].x < thresholdFloor || std::isnan(data[i].x)) data[i].x = thresholdFloor;
+  if (data[i].y < thresholdFloor || std::isnan(data[i].y)) data[i].y = thresholdFloor;
+  if (data[i].z < thresholdFloor || std::isnan(data[i].z)) data[i].z = thresholdFloor;
 }
+
 void MinMaxArray(float& data, float& min, float& max, const float thresholdFloor, const float thresholdTop)
 {
   if (data < min && data > 0.0f)  min = data;
@@ -1348,7 +1349,7 @@ void DiffractionStars(float4* inData, float3 diffrStars[], const float a_sizeSta
   const float waveLenghtB = 0.000450f;
   const float waveLenghtV = 0.000400f;
 
-  float lum = Luminance(&inData[i]);
+  float lum = Luminance(inData[i]);
   lum /= (1.0f + lum);
 
   // Ray

@@ -11,10 +11,10 @@
 
 #include "HydraPostProcessSpecial.h"
 
-using HydraLiteMath::float4;
-using HydraLiteMath::float3;
+using LiteMath::float4;
+using LiteMath::float3;
 using HydraRender::HDRImage4f;
-using HydraLiteMath::clamp;
+using LiteMath::clamp;
 
 static inline int clampi(int x, int a, int b)
 {
@@ -49,7 +49,7 @@ static inline float NLMWeight(const float4* in_buff, int w, int h, int x, int y,
         const float4 c3 = in_buff[y3*w + x3];
 
         const float4 dist = c2 - c3;
-        w1 += dot3(dist, dist);
+        w1 += dot3f(dist, dist);
       }
     }
 

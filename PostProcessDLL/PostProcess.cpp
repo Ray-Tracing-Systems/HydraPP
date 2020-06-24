@@ -288,11 +288,11 @@ void ExecutePostProcessHydra1(
 
   // ----- Analization, precalculate and any effects. Loop 1. -----
   //#pragma omp parallel for
-  for (unsigned int y = 0; y < a_height; ++y)
+  for (int y = 0; y < a_height; ++y)
   {
-    for (unsigned int x = 0; x < a_width; ++x)
+    for (int x = 0; x < a_width; ++x)
     {
-      const unsigned int i = y * a_width + x;
+      const int i = y * a_width + x;
 
       image4out[i] = image4in[i];  
 
@@ -311,36 +311,27 @@ void ExecutePostProcessHydra1(
         image4out[i].z *= a_exposure;
       }
 
-      // Max & Min value and clamp minus zero
+      // Minimum, maximum, negative number clamp and NaN.
       MinMaxRgb(image4out, minRgbSource, maxRgbSource, 0.0f, i);
 
       // Collect all the brightness values by channel.
-      if (a_whiteBalance > 0.0f)
-      {
-        if (autoWhiteBalance && image4out[i].x < 1.0f && image4out[i].y < 1.0f && image4out[i].z < 1.0f)
-          SummValueOnField(image4out, &summRgb, i);
-      }
+      if (a_whiteBalance > 0.0f && autoWhiteBalance && image4out[i].x < 1.0f && image4out[i].y < 1.0f && image4out[i].z < 1.0f)
+        SummValueOnField(image4out, &summRgb, i);
+      
 
       // ----- Vignette -----
-      if (a_vignette > 0.0f)
-      {
-        Vignette(image4out, a_width, a_height, a_vignette, diagonalImage, centerImageX,
-          centerImageY, radiusImage, x, y, i);
-      }
+      if (a_vignette > 0.0f)      
+        Vignette(image4out, a_width, a_height, a_vignette, diagonalImage, centerImageX, centerImageY, radiusImage, x, y, i);
+      
 
       // ----- Difraction stars -----
-      if (a_sizeStar > 0.0f && image4out[i].x > 50.0f || image4out[i].y > 50.0f || image4out[i].z > 50.0f)
-      {
-        DiffractionStars(image4out, diffrStars, a_sizeStar, a_numRay, a_rotateRay,
-          a_randomAngle, a_sprayRay, a_width, a_height, sizeImage, radiusImage, x, y, i);
-      }
+      if (a_sizeStar > 0.0f && image4out[i].x > 50.0f || image4out[i].y > 50.0f || image4out[i].z > 50.0f)      
+        DiffractionStars(image4out, diffrStars, a_sizeStar, a_numRay, a_rotateRay, a_randomAngle, a_sprayRay, a_width, a_height, sizeImage, radiusImage, x, y, i);
+      
 
       // ----- Chromatic aberration -----
       if (a_chromAberr > 0.0f)
-      {
-        ChrommAberr(image4out, chromAbberR, chromAbberG, a_width, a_height, sizeImage,
-          a_chromAberr, x, y, i);
-      }
+        ChrommAberr(image4out, chromAbberR, chromAbberG, a_width, a_height, sizeImage, a_chromAberr, x, y, i);      
     }
   }
 
@@ -372,7 +363,7 @@ void ExecutePostProcessHydra1(
     MatrixCat02(&a_whitePointColor);
     MatrixCat02(&d65);
 
-    const float lum = Luminance(&a_whitePointColor);
+    const float lum = Luminance(a_whitePointColor);
 
     if (lum > 0.0f)
     {
@@ -408,7 +399,7 @@ void ExecutePostProcessHydra1(
     // ----- Saturation  -----
     if (a_saturation != 1.0f)
     {
-      const float lum = Luminance(&image4out[i]);
+      const float lum = Luminance(image4out[i]);
 
       // Return to main array
       image4out[i].x = lum + (image4out[i].x - lum) * a_saturation;
