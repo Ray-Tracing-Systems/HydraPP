@@ -21,18 +21,62 @@
 using LiteMath::float3;
 using LiteMath::float4;
 
+
+float Min3(const float a, const float b, const float c)
+{  
+  if      (a <= b && a <= c) return a;
+  else if (b <= a && a <= c) return b;
+  else                       return c;
+}
+
+float Max3(const float a, const float b, const float c)
+{
+  if      (a >= b && a >= c) return a;
+  else if (b >= a && a >= c) return b;
+  else                       return c;
+}
+
+float Clamp(const float u, const float a, const float b) { const float r = fmax(a, u); return fmin(r, b); }
+
+void ClampMinusToZero(float4& data)
+{
+  data.x = fmax(data.x, 0.0F);
+  data.y = fmax(data.y, 0.0F);
+  data.z = fmax(data.z, 0.0F);
+}
+
 float Luminance(float3 data)
 {
-  return dot(data, float3(0.2126f, 0.7152f, 0.0722f));  
+  return dot(data, float3(0.2126F, 0.7152F, 0.0722F));  
 }
+
 float Luminance(float4 data)
 {
-  return dot({ data.x, data.y, data.z }, float3(0.2126f, 0.7152f, 0.0722f));
+  return dot({ data.x, data.y, data.z }, float3(0.2126F, 0.7152F, 0.0722F));
 }
+
 float Mean(const float4 * data)
 {
   return (data->x + data->y + data->z) / 3.0f;
 }
+
+float Distance(const float x1, const float y1, const float x2, const float y2)
+{
+  float differenceX = x1 - x2;
+  float differenceY = y1 - y2;
+
+  float distance = sqrt(differenceX * differenceX + differenceY * differenceY);
+  return distance;
+}
+
+float Distance(const float3 point1, const float point2)
+{
+  float3 difference(point1.x - point2, point1.y - point2, point1.z - point2);
+
+  float distance = sqrt(difference.x * difference.x + difference.y * difference.y + difference.z * difference.z);
+  return distance;
+}
+
 void SpectralToRGB(float &r, float &g, float &b, const float l) // RGB <0,1> <- lambda l <400,700> [nm]
 {
   float t;
@@ -53,9 +97,6 @@ void SpectralToRGB(float &r, float &g, float &b, const float l) // RGB <0,1> <- 
 }
 void ConvertRgbToHsv(float4* data)
 {
-#define MIN3(x,y,z)  ((y) <= (z) ? ((x) <= (y) ? (x) : (y)) : ((x) <= (z) ? (x) : (z)))
-#define MAX3(x,y,z)  ((y) >= (z) ? ((x) >= (y) ? (x) : (y)) : ((x) >= (z) ? (x) : (z)))
-
   float r = data->x;
   float g = data->y;
   float b = data->z;
@@ -64,8 +105,8 @@ void ConvertRgbToHsv(float4* data)
   g *= 255.0f;
   b *= 255.0f;
 
-  float rgb_min = MIN3(r, g, b);
-  float rgb_max = MAX3(r, g, b);
+  float rgb_min = Min3(r, g, b);
+  float rgb_max = Max3(r, g, b);
 
   float H = 0.0f;
   float S = 0.0f;
@@ -79,8 +120,8 @@ void ConvertRgbToHsv(float4* data)
     b /= V;
   }
 
-  rgb_min = MIN3(r, g, b);
-  rgb_max = MAX3(r, g, b);
+  rgb_min = Min3(r, g, b);
+  rgb_max = Max3(r, g, b);
 
   S = rgb_max - rgb_min;
 
@@ -92,8 +133,8 @@ void ConvertRgbToHsv(float4* data)
     b = (b - rgb_min) / S;
   }
 
-  rgb_min = MIN3(r, g, b);
-  rgb_max = MAX3(r, g, b);
+  rgb_min = Min3(r, g, b);
+  rgb_max = Max3(r, g, b);
 
   if (rgb_max == r)
   {
@@ -142,25 +183,26 @@ void ConvertRgbToXyz65(float4* data)
   data->y = var_R * 0.2126729f + var_G * 0.7151522f + var_B * 0.0721750f;
   data->z = var_R * 0.0193339f + var_G * 0.1191920f + var_B * 0.9503041f;
 }
-void ConvertSrgbToXyz(float3* data)
+void ConvertSrgbToXyz(float3& a_data)
 {
-  const float R = data->x;
-  const float G = data->y;
-  const float B = data->z;
+  const float R = a_data.x;
+  const float G = a_data.y;
+  const float B = a_data.z;
 
-  data->x = R * 0.4124564f + G * 0.3575761f + B * 0.1804375f;
-  data->y = R * 0.2126729f + G * 0.7151522f + B * 0.0721750f;
-  data->z = R * 0.0193339f + G * 0.1191920f + B * 0.9503041f;
+  a_data.x = R * 0.4124564F + G * 0.3575761F + B * 0.1804375F;
+  a_data.y = R * 0.2126729F + G * 0.7151522F + B * 0.0721750F;
+  a_data.z = R * 0.0193339F + G * 0.1191920F + B * 0.9503041F;
 }
-void ConvertSrgbToXyz(float4* data)
-{
-  const float R = data->x;
-  const float G = data->y;
-  const float B = data->z;
 
-  data->x = R * 0.4124564f + G * 0.3575761f + B * 0.1804375f;
-  data->y = R * 0.2126729f + G * 0.7151522f + B * 0.0721750f;
-  data->z = R * 0.0193339f + G * 0.1191920f + B * 0.9503041f;
+void ConvertSrgbToXyz(float4& a_data)
+{
+  const float R = a_data.x;
+  const float G = a_data.y;
+  const float B = a_data.z;
+
+  a_data.x = R * 0.4124564F + G * 0.3575761F + B * 0.1804375F;
+  a_data.y = R * 0.2126729F + G * 0.7151522F + B * 0.0721750F;
+  a_data.z = R * 0.0193339F + G * 0.1191920F + B * 0.9503041F;
 }
 void ConvertXyz65ToRgb(float4* data)
 {
@@ -185,16 +227,17 @@ void ConvertXyz65ToRgb(float4* data)
   data->y = G;
   data->z = B;
 }
-void ConvertXyzToSrgb(float4* data)
+void ConvertXyzToSrgb(float4& a_data)
 {
-  const float X = data->x;
-  const float Y = data->y;
-  const float Z = data->z;
+  const float X = a_data.x;
+  const float Y = a_data.y;
+  const float Z = a_data.z;
 
-  data->x = X * 3.2404542f + Y * -1.5371385f + Z * -0.4985314f;
-  data->y = X * -0.9692660f + Y * 1.8760108f + Z * 0.0415560f;
-  data->z = X * 0.0556434f + Y * -0.2040259f + Z * 1.0572252f;
+  a_data.x = X *  3.2404542F + Y * -1.5371385F + Z * -0.4985314F;
+  a_data.y = X * -0.9692660F + Y *  1.8760108F + Z *  0.0415560F;
+  a_data.z = X *  0.0556434F + Y * -0.2040259F + Z *  1.0572252F;
 }
+
 void ConvertXyzToLab(float3* data)
 {
   float var_X = data->x / 95.0470f;   //Observer= 2°, Illuminant= D65 
@@ -317,53 +360,58 @@ void ConvertLabToXyz(float4* data)
   data->y = var_Y * 100.0f;    //
   data->z = var_Z * 108.883f;  //
 }
-void MatrixCat02(float3* data)
+
+void MatrixCat02(float3& a_data)
 {
   // Conversion to cone responses. Mcat02 in CAM02. 
-  const float R = 0.7328f * data->x + 0.4296f * data->y + -0.1624f * data->z;
-  const float G = -0.7036f * data->x + 1.6975f * data->y + 0.0061f * data->z;
-  const float B = 0.0030f * data->x + 0.0136f * data->y + 0.9834f * data->z;
+  const float R =  0.7328F * a_data.x + 0.4296F * a_data.y + -0.1624F * a_data.z;
+  const float G = -0.7036F * a_data.x + 1.6975F * a_data.y +  0.0061F * a_data.z;
+  const float B =  0.0030F * a_data.x + 0.0136F * a_data.y +  0.9834F * a_data.z;
 
-  data->x = R;
-  data->y = G;
-  data->z = B;
+  a_data.x = R;
+  a_data.y = G;
+  a_data.z = B;
 }
-void MatrixCat02(float4* data)
+
+void MatrixCat02(float4& a_data)
 {
   // Conversion to cone responses. Mcat02 in CAM02. 
 
-  const float R = 0.7328f * data->x + 0.4296f * data->y + -0.1624f * data->z;
-  const float G = -0.7036f * data->x + 1.6975f * data->y + 0.0061f * data->z;
-  const float B = 0.0030f * data->x + 0.0136f * data->y + 0.9834f * data->z;
+  const float R =  0.7328F * a_data.x + 0.4296F * a_data.y + -0.1624F * a_data.z;
+  const float G = -0.7036F * a_data.x + 1.6975F * a_data.y +  0.0061F * a_data.z;
+  const float B =  0.0030F * a_data.x + 0.0136F * a_data.y +  0.9834F * a_data.z;
 
-  data->x = R;
-  data->y = G;
-  data->z = B;
+  a_data.x = R;
+  a_data.y = G;
+  a_data.z = B;
 }
+
 template <typename T>
-void InverseMatrixCat02(T* data)
+void InverseMatrixCat02(T& a_data)
 {
   // Inverse Mcat02 in CAM02. 
-  const float X = 1.096124f * data->x + -0.278869f * data->y + 0.182745f * data->z;
-  const float Y = 0.454369f * data->x + 0.473533f * data->y + 0.072098f * data->z;
-  const float Z = -0.009628f * data->x + -0.005698f * data->y + 1.015326f * data->z;
+  const float X =  1.096124F * a_data.x + -0.278869F * a_data.y + 0.182745F * a_data.z;
+  const float Y =  0.454369F * a_data.x +  0.473533F * a_data.y + 0.072098F * a_data.z;
+  const float Z = -0.009628F * a_data.x + -0.005698F * a_data.y + 1.015326F * a_data.z;
 
-  data->x = X;
-  data->y = Y;
-  data->z = Z;
+  a_data.x = X;
+  a_data.y = Y;
+  a_data.z = Z;
 }
+
 template <typename T>
-void MatrixHpe(T* data)
+void MatrixHpe(T& a_data)
 {
   // Conversion to cone responses. Matrix HPE in CAM02. (Hunt-Pointer-Estevez)
-  const float L = 0.38971f * data->x + 0.68898f * data->y + -0.07868f * data->z; //Kuo modify −0.07869
-  const float M = -0.22981f * data->x + 1.18340f * data->y + 0.04641f * data->z; //            0.04642f ?
-  const float S = data->z;
+  const float L =  0.38971F * a_data.x + 0.68898F * a_data.y + -0.07868F * a_data.z; //Kuo modify −0.07869
+  const float M = -0.22981F * a_data.x + 1.18340F * a_data.y +  0.04641F * a_data.z; //            0.04642f ?
+  const float S = a_data.z;
 
-  data->x = L;
-  data->y = M;
-  data->z = S;
+  a_data.x = L;
+  a_data.y = M;
+  a_data.z = S;
 }
+
 void InverseMatrixHpe(float4 * data)
 {
   // Inverse matrix HPE in CAM02. 
@@ -375,6 +423,7 @@ void InverseMatrixHpe(float4 * data)
   data->y = G;
   data->z = B;
 }
+
 void ConvertXyzToLmsVonKries(float4* data)
 {
   const float L = 0.4002400f * data->x + 0.7076000f * data->y + -0.0808100f * data->z;
@@ -414,35 +463,37 @@ void ConvertXyzToLms(float4* data)
   data->y = M;
   data->z = S;
 }
-void ConvertXyzToLmsPower(float4 * data, const float power)
+void ConvertXyzToLmsPower(float4& a_data, const float a_power)
 {
-  float L = 0.4002f * data->x + 0.7075f * data->y + -0.0807f * data->z;
-  float M = -0.2280f * data->x + 1.1500f * data->y + 0.0612f * data->z;
-  float S = 0.9184f * data->z;
+  float L = 0.4002F * a_data.x + 0.7075F * a_data.y + -0.0807F * a_data.z;
+  float M = -0.2280F * a_data.x + 1.1500F * a_data.y + 0.0612F * a_data.z;
+  float S = 0.9184F * a_data.z;
 
-  const float a = power;
+  const float a = a_power;
 
-  if (L >= 0.0f) L = pow(L, a);
-  else if (L < 0.0f) L = -pow(-L, a);
-  if (M >= 0.0f) M = pow(M, a);
-  else if (M < 0.0f) M = -pow(-M, a);
-  if (S >= 0.0f) S = pow(S, a);
-  else if (S < 0.0f) S = -pow(-S, a);
+  if (L >= 0.0F) L = pow(L, a);
+  else if (L < 0.0F) L = -pow(-L, a);
+  if (M >= 0.0F) M = pow(M, a);
+  else if (M < 0.0F) M = -pow(-M, a);
+  if (S >= 0.0F) S = pow(S, a);
+  else if (S < 0.0F) S = -pow(-S, a);
 
-  data->x = L;
-  data->y = M;
-  data->z = S;
+  a_data.x = L;
+  a_data.y = M;
+  a_data.z = S;
 }
-void ConvertLmsToIpt(float4* data)
+
+void ConvertLmsToIpt(float4& a_data)
 {
-  const float I = 0.4000f * data->x + 0.4000f * data->y + 0.2000f * data->z;
-  const float P = 4.4550f * data->x + -4.8510f * data->y + 0.3960f * data->z;
-  const float T = 0.8056f * data->x + 0.3572f * data->y + -1.1628f * data->z;
+  const float I = 0.4000F * a_data.x +  0.4000F * a_data.y +  0.2000F * a_data.z;
+  const float P = 4.4550F * a_data.x + -4.8510F * a_data.y +  0.3960F * a_data.z;
+  const float T = 0.8056F * a_data.x +  0.3572F * a_data.y + -1.1628F * a_data.z;
 
-  data->x = I;
-  data->y = P;
-  data->z = T;
+  a_data.x = I;
+  a_data.y = P;
+  a_data.z = T;
 }
+
 void ConvertLmsToXyz(float4* data)
 {
   float L = data->x;
@@ -453,52 +504,55 @@ void ConvertLmsToXyz(float4* data)
   data->y = 0.3660f * L + 0.6444f * M + -0.010f  * S;
   data->z = 1.0893f * S;
 }
-void ConvertLmsToXyzPower(float4* data)
+
+void ConvertLmsToXyzPower(float4& a_data)
 {
-  float L = data->x;
-  float M = data->y;
-  float S = data->z;
+  float L = a_data.x;
+  float M = a_data.y;
+  float S = a_data.z;
 
-  const float a = 2.3255819f; //  = 1.0f / 0.43f;
+  const float a = 1.0F / 0.43F;
+  
+  if      (L >= 0.0F) L =  pow( L, a);
+  else if (L <  0.0F) L = -pow(-L, a);
+  if      (M >= 0.0F) M =  pow( M, a);
+  else if (M <  0.0F) M = -pow(-M, a);
+  if      (S >= 0.0F) S =  pow( S, a);
+  else if (S <  0.0F) S = -pow(-S, a);
 
-  if (L >= 0.0f) L = pow(L, a);
-  else if (L < 0.0f) L = -pow(-L, a);
-  if (M >= 0.0f) M = pow(M, a);
-  else if (M < 0.0f) M = -pow(-M, a);
-  if (S >= 0.0f) S = pow(S, a);
-  else if (S < 0.0f) S = -pow(-S, a);
-
-  data->x = 1.8493f * L + -1.1383f * M + 0.2381f * S;
-  data->y = 0.3660f * L + 0.6444f * M + -0.010f  * S;
-  data->z = 1.0893f * S;
+  a_data.x = 1.8493F * L + -1.1383F * M +  0.2381F * S;
+  a_data.y = 0.3660F * L +  0.6444F * M + -0.0100F * S;
+  a_data.z = 1.0893F * S;
 }
-void ConvertIptToLms(float4* data)
-{
-  const float L = 0.9999f * data->x + 0.0970f * data->y + 0.2053f * data->z;
-  const float M = 0.9999f * data->x + -0.1138f * data->y + 0.1332f * data->z;
-  const float S = 0.9999f * data->x + 0.0325f * data->y + -0.6768f * data->z;
 
-  data->x = L;
-  data->y = M;
-  data->z = S;
+void ConvertIptToLms(float4& a_data)
+{
+  const float L = 0.9999F * a_data.x +  0.0970F * a_data.y +  0.2053F * a_data.z;
+  const float M = 0.9999F * a_data.x + -0.1138F * a_data.y +  0.1332F * a_data.z;
+  const float S = 0.9999F * a_data.x +  0.0325F * a_data.y + -0.6768F * a_data.z;
+
+  a_data.x = L;
+  a_data.y = M;
+  a_data.z = S;
 }
-void ChromAdaptIcam(float4* data, float3 dataW, float3 d65, const float D)
+
+void ChromAdaptIcam(float4& a_data, const float3 a_dataW, const float3 a_d65, const float a_D)
 {
-  MatrixCat02(data);
+  MatrixCat02(a_data);
 
-  const float Rw = dataW.x + 0.0000001f;
-  const float Gw = dataW.y + 0.0000001f;
-  const float Bw = dataW.z + 0.0000001f;
+  const float Rw = a_dataW.x + 0.0000001f;
+  const float Gw = a_dataW.y + 0.0000001f;
+  const float Bw = a_dataW.z + 0.0000001f;
 
-  const float Rc = (d65.x * D / Rw + 1.0f - D) * data->x;
-  const float Gc = (d65.y * D / Gw + 1.0f - D) * data->y;
-  const float Bc = (d65.z * D / Bw + 1.0f - D) * data->z;
+  const float Rc = (a_d65.x * a_D / Rw + 1.0f - a_D) * a_data.x;
+  const float Gc = (a_d65.y * a_D / Gw + 1.0f - a_D) * a_data.y;
+  const float Bc = (a_d65.z * a_D / Bw + 1.0f - a_D) * a_data.z;
 
-  data->x = Rc;
-  data->y = Gc;
-  data->z = Bc;
+  a_data.x = Rc;
+  a_data.y = Gc;
+  a_data.z = Bc;
 
-  InverseMatrixCat02(data);
+  InverseMatrixCat02(a_data);
 }
 void InverseChromAdaptIcam(float4* data, const float D)
 {
@@ -600,6 +654,7 @@ void Mediana(float inData[], const int radius, const int a_width, const int a_he
   for (int i = 0; i < sizeImage; ++i)
     inData[i] = tmpData[i];
 }
+
 void Blend(float& inData1, const float& inData2, const float amount) // 0 - data1, 1 - data2
 {
   inData1 = inData1 + (inData2 - inData1) * amount;
@@ -797,14 +852,143 @@ void UniformContrast(float data[], const int sizeImage, const int histogramBin)
   }
 }
 
-float Distance(const float x1, const float y1, const float x2, const float y2)
+void ComputeWhitePoint(const float3 summRgb, float3* whitePoint, const int sizeImage)
 {
-  float differenceX = x1 - x2;
-  float differenceY = y1 - y2;
-
-  float distance = sqrt(differenceX * differenceX + differenceY * differenceY);
-  return distance;
+  whitePoint->x = summRgb.x / (float)sizeImage;
+  whitePoint->y = summRgb.y / (float)sizeImage;
+  whitePoint->z = summRgb.z / (float)sizeImage;
 }
+
+void GetWhitePointForWhiteBalance(const bool a_autoWhiteBalance, const float3 a_summRgb, float3& a_whitePointColor, const int a_sizeImage, float3& a_d65)
+{
+  if (a_autoWhiteBalance)
+    ComputeWhitePoint(a_summRgb, &a_whitePointColor, a_sizeImage);
+
+  ConvertSrgbToXyz(a_whitePointColor);
+  MatrixCat02(a_whitePointColor);
+  MatrixCat02(a_d65);
+
+  const float lum = Luminance(a_whitePointColor);
+
+  if (lum > 0.0F)
+  {
+    a_whitePointColor.x /= lum;
+    a_whitePointColor.y /= lum;
+    a_whitePointColor.z /= lum;
+  }
+}
+
+void WhiteBalance(float4& a_data, const float3 a_whitePointColor, const float3 a_d65, const float a_whiteBalance)
+{
+  ConvertSrgbToXyz(a_data);
+  ChromAdaptIcam(a_data, a_whitePointColor, a_d65, a_whiteBalance);
+  ConvertXyzToSrgb(a_data);
+}
+
+
+void Saturation(float4& a_data, const float a_saturation)
+{
+  const float lum = Luminance(a_data);
+
+  a_data.x = lum + (a_data.x - lum) * a_saturation;
+  a_data.y = lum + (a_data.y - lum) * a_saturation;
+  a_data.z = lum + (a_data.z - lum) * a_saturation;
+
+  ClampMinusToZero(a_data);
+}
+
+
+void Vibrance(float4& a_data, const float a_vibrance) // saturation of unsaturated colors. 
+{  
+  const float3 normalizeColor = normalize(float3(a_data.x, a_data.y, a_data.z));
+  const float  lum            = Luminance(normalizeColor);
+  const float  saturationDist = Distance(normalizeColor, lum);      // 0.0F(desat.) - 1.0F(satur.)
+  const float  blend          = saturationDist + (1.0F - saturationDist) * pow(a_vibrance, 1.5F);
+
+  // IPT
+  ConvertSrgbToXyz(a_data);
+  ConvertXyzToLmsPower(a_data, 0.43F);
+  ConvertLmsToIpt(a_data);
+
+  a_data.y *= blend;
+  a_data.z *= blend;
+
+  ConvertIptToLms(a_data);
+  ConvertLmsToXyzPower(a_data);
+  ConvertXyzToSrgb(a_data);
+
+  ClampMinusToZero(a_data);
+}
+
+
+void CompressIPT(float4& a_data, const float a_compress)
+{
+  // Global LMS/IPT compress.
+  float knee           = 10.0F;
+  Blend(knee, 2.0F, pow(a_compress, 0.175F)); // lower = softer
+  const float antiKnee = 1.0F / knee;
+
+  ConvertSrgbToXyz    (a_data);
+  ConvertXyzToLmsPower(a_data, 0.43F);
+  ConvertLmsToIpt     (a_data);
+
+  const float compLum = a_data.x / pow((1.0F + pow(a_data.x, knee)), antiKnee);
+  const float multSat = pow(compLum / a_data.x, 1.5F);
+
+  a_data.x            = compLum;
+  a_data.y           *= multSat;
+  a_data.z           *= multSat;
+
+  ConvertIptToLms     (a_data);
+  ConvertLmsToXyzPower(a_data);
+  ConvertXyzToSrgb    (a_data);
+
+  ClampMinusToZero(a_data);
+}
+
+
+void Contrast(float4& a_data, const float a_contrast)
+{
+  //RGB
+  float4 contrRGB = a_data;
+  contrRGB.x      = pow(contrRGB.x, 1.0F / 2.2F);
+  contrRGB.y      = pow(contrRGB.y, 1.0F / 2.2F);
+  contrRGB.z      = pow(contrRGB.z, 1.0F / 2.2F);
+  ContrastField(contrRGB.x, a_contrast - 1.0F);
+  ContrastField(contrRGB.y, a_contrast - 1.0F);
+  ContrastField(contrRGB.z, a_contrast - 1.0F);
+  contrRGB.x      = pow(contrRGB.x, 2.2F);
+  contrRGB.y      = pow(contrRGB.y, 2.2F);
+  contrRGB.z      = pow(contrRGB.z, 2.2F);
+
+  //IPT
+  ConvertSrgbToXyz(a_data);
+  ConvertXyzToLmsPower(a_data, 0.43F);
+  ConvertLmsToIpt(a_data);
+
+  float lumContr        = a_data.x;
+  ContrastField(lumContr, a_contrast - 1.0F);
+
+  const float multColor = 1.0F + abs(a_data.x - lumContr);
+  a_data.y             *= multColor;
+  a_data.z             *= multColor;
+  a_data.x              = lumContr;
+
+  ConvertIptToLms(a_data);
+  ConvertLmsToXyzPower(a_data);
+  ConvertXyzToSrgb(a_data);
+
+  // Blend RGB and IPT 50x50%
+  Blend(a_data.x, contrRGB.x, 0.5F);
+  Blend(a_data.y, contrRGB.y, 0.5F);
+  Blend(a_data.z, contrRGB.z, 0.5F);
+
+  ClampMinusToZero(a_data);
+}
+
+
+
+
 void Bilinear(const float inData, float outData[], float newPosX, float newPosY, const int m_width, const int m_height, const int sizeImage)
 {
   // |------|------|
@@ -890,31 +1074,20 @@ void Bilinear3(const float3 inData, float3 outData[], float newPosX, float newPo
   }
 }
 
-void ClampMinusToZero(float4* data4, const int i)
-{
-  if (data4[i].x < 0) data4[i].x = 0;
-  if (data4[i].y < 0) data4[i].y = 0;
-  if (data4[i].z < 0) data4[i].z = 0;
-}
-void ClampMinusToZero(float4* data4)
-{
-  if (data4->x < 0) data4->x = 0;
-  if (data4->y < 0) data4->y = 0;
-  if (data4->z < 0) data4->z = 0;
-}
-void Vignette(float4* data4, const int m_width, const int m_height, const float a_vignette,
-              const float diagonalImage, const float centerImageX, const float centerImageY,
-              const float radiusImage, const int x, const int y, const int i)
+
+void Vignette(float4* data4, const float a_vignette, const float centerImageX, const float centerImageY, const float radiusImage, 
+  const int x, const int y, const int i)
 {
   const float distanceFromCenter = Distance((float)x, (float)y, centerImageX, centerImageY) / radiusImage;
 
-  float vignetteIntensity = sqrt(1 - distanceFromCenter * a_vignette);
+  float vignetteIntensity = sqrt(1.0F - distanceFromCenter * a_vignette);
   if (vignetteIntensity < 0.0f) vignetteIntensity = 0;
 
   data4[i].x *= vignetteIntensity;
   data4[i].y *= vignetteIntensity;
   data4[i].z *= vignetteIntensity;
 }
+
 void SummValueOnField(const float4 data[], float3* summRgb, const int i)
 {
 #pragma omp atomic
@@ -942,12 +1115,8 @@ void ChrommAberr(const float4 inData[], float outData1[], float outData2[], cons
   Bilinear(inData[i].x, outData1, newPosXr, newPosYr, m_width, m_height, sizeImage);
   Bilinear(inData[i].y, outData2, newPosXg, newPosYg, m_width, m_height, sizeImage);
 }
-void ComputeWhitePoint(const float3 summRgb, float3* whitePoint, const int sizeImage)
-{
-  whitePoint->x = summRgb.x / (float)sizeImage;
-  whitePoint->y = summRgb.y / (float)sizeImage;
-  whitePoint->z = summRgb.z / (float)sizeImage;
-}
+
+
 void MinMaxRgb(float4* data, float& minRgb, float& maxRgb, const float thresholdFloor, const int i)
 {
   omp_set_lock;
@@ -1087,20 +1256,6 @@ void MinMaxHistBin(const float* histogram, float& minHistBin, float& maxHistBin,
   maxHistBin /= histogramBin;
 }
 
-float Min3(const float value1, const float value2, const float value3)
-{
-  if (value1 <= value2 && value1 <= value3) return value1;
-  else if (value2 <= value1 && value1 <= value3) return value2;
-  else                                           return value3;
-}
-
-float Max3(const float value1, const float value2, const float value3)
-{
-  if (value1 >= value2 && value1 >= value3) return value1;
-  else if (value2 >= value1 && value1 >= value3) return value2;
-  else                                           return value3;
-
-}
 
 int FloatToInt(const float inData)
 {

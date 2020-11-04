@@ -37,12 +37,10 @@ void PostProcessHydra1::Release()
 
 void ExecutePostProcessHydra1(
   const float* a_input, float* a_output, unsigned int a_numThreads,
-  const float a_exposure, const float a_compress, const float a_contrast,
-  const float a_saturation, const float a_whiteBalance, float3 a_whitePointColor,
-  const float a_uniformContrast, const float a_normalize, const float a_vignette,
-  const float a_chromAberr, const float a_sharpness, const float a_sizeStar,
-  const int a_numRay, const int a_rotateRay, const float a_randomAngle,
-  const float a_sprayRay, unsigned int a_width, unsigned int a_height); // forward declaraion
+  const float a_exposure, const float a_compress, const float a_contrast, const float a_saturation, const float a_vibrance,
+  const float a_whiteBalance, float3 a_whitePointColor, const float a_uniformContrast, const float a_normalize, const float a_vignette,
+  const float a_chromAberr, const float a_sharpness, const float a_sizeStar, const int a_numRay, const int a_rotateRay, 
+  const float a_randomAngle, const float a_sprayRay, unsigned int a_width, unsigned int a_height); // forward declaraion
 
 bool PostProcessHydra1::Eval()
 {
@@ -60,6 +58,7 @@ bool PostProcessHydra1::Eval()
   float compress          = settings.attribute(L"compress").as_float();
   float contrast          = settings.attribute(L"contrast").as_float();
   float saturation        = settings.attribute(L"saturation").as_float();
+  float vibrance          = settings.attribute(L"vibrance").as_float();
   float whiteBalance      = settings.attribute(L"whiteBalance").as_float();
   float3 whitePointColor  = HydraXMLHelpers::ReadFloat3(settings.attribute(L"whitePointColor"));
   float uniformContrast   = settings.attribute(L"uniformContrast").as_float();
@@ -83,76 +82,79 @@ bool PostProcessHydra1::Eval()
 
   // check we have correct in and out arguments
   //
-  if (exposure < 0.0f || compress < 0.0f || contrast < 0.0f ||
-    saturation < 0.0f || whiteBalance < 0.0f || whitePointColor.x < 0.0f || 
-    whitePointColor.y < 0.0f || whitePointColor.z < 0.0f || uniformContrast < 0.0f || 
-    normalize < 0.0f || vignette < 0.0f || chromAberr < 0.0f || sharpness < 0.0f ||
-    sizeStar < 0.0f || numRay < 0.0f || rotateRay < 0.0f || randomAngle < 0.0f || 
-    sprayRay < 0.0f)
+  if (exposure < 0.0F || compress < 0.0F || contrast < 0.0F || saturation < 0.0F || vibrance < 0.0F || whiteBalance < 0.0F ||
+    whitePointColor.x < 0.0F || whitePointColor.y < 0.0F || whitePointColor.z < 0.0F || uniformContrast < 0.0F || normalize < 0.0F ||
+    vignette < 0.0F || chromAberr < 0.0F || sharpness < 0.0F || sizeStar < 0.0F || numRay < 0.0F || rotateRay < 0.0F || 
+    randomAngle < 0.0F || sprayRay < 0.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; Arguments must be greater than zero.", ERR_MSG_SIZE);
     return false;
   }
 
-  if (exposure > 10.0f)
+  if (exposure > 10.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; exposure should be in the range 0 - 10. Default 1. This will be limited to 10.", ERR_MSG_SIZE);
-    exposure = 10.0f;
+    exposure = 10.0F;
   }
-  if (compress > 1.0f)
+  if (compress > 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; compress should be in the range 0 - 1. Default 0. This will be limited to 1.", ERR_MSG_SIZE);
-    compress = 1.0f;
+    compress = 1.0F;
   }
-  if (contrast < 1.0f)
+  if (contrast < 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; contrast should be in the range 1 - 2. Default 1. This will be limited to 1.", ERR_MSG_SIZE);
-    contrast = 1.0f;
+    contrast = 1.0F;
   }
-  else if (contrast > 2.0f)
+  else if (contrast > 2.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; contrast should be in the range 1 - 2. Default 1. This will be limited to 2.", ERR_MSG_SIZE);
-    contrast = 2.0f;
+    contrast = 2.0F;
   }
-  if (saturation > 2.0f)
+  if (saturation > 2.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; saturation should be in the range 0 - 2. Default 1. This will be limited to 2.", ERR_MSG_SIZE);
-    saturation = 2.0f;
+    saturation = 2.0F;
   }
-  if (whiteBalance > 1.0f)
+  if (vibrance > 2.0F)
+  {
+    wcsncpy_s(m_msg, L"post_process_hydra1; vibrance should be in the range 0 - 2. Default 1. This will be limited to 2.", ERR_MSG_SIZE);
+    vibrance = 2.0F;
+  }
+  if (whiteBalance > 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; whiteBalance should be in the range 0 - 1. Default 0. This will be limited to 1.", ERR_MSG_SIZE);
-    whiteBalance = 1.0f;
+    whiteBalance = 1.0F;
   }
-  if (uniformContrast > 1.0f)
+  if (uniformContrast > 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; uniformContrast should be in the range 0 - 1. Default 0. This will be limited to 1.", ERR_MSG_SIZE);
-    uniformContrast = 1.0f;
+    uniformContrast = 1.0F;
   }
-  if (normalize > 1.0f)
+  if (normalize > 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; normalize should be in the range 0 - 1. Default 0. This will be limited to 1.", ERR_MSG_SIZE);
-    normalize = 1.0f;
+    normalize = 1.0F;
   }
-  if (vignette > 1.0f)
+  if (vignette > 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; vignette should be in the range 0 - 1. Default 0. This will be limited to 1.", ERR_MSG_SIZE);
-    vignette = 1.0f;
+    vignette = 1.0F;
   }
-  if (chromAberr > 1.0f)
+  if (chromAberr > 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; chromAberr should be in the range 0 - 1. This will be limited to 1.", ERR_MSG_SIZE);
-    chromAberr = 1.0f;
+    chromAberr = 1.0F;
   }
-  if (sharpness > 1.0f)
+  if (sharpness > 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; sharpness should be in the range 0 - 1. This will be limited to 1.", ERR_MSG_SIZE);
-    sharpness = 1.0f;
+    sharpness = 1.0F;
   }
-  if (sizeStar > 100.0f)
+  if (sizeStar > 100.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; sizeStar should be in the range 0 - 100. This will be limited to 100.", ERR_MSG_SIZE);
-    sizeStar = 100.0f;
+    sizeStar = 100.0F;
   }
   if (numRay > 16)
   {
@@ -164,15 +166,15 @@ bool PostProcessHydra1::Eval()
     wcsncpy_s(m_msg, L"post_process_hydra1; rotateRay should be in the range 0 - 360. This will be limited to 360.", ERR_MSG_SIZE);
     rotateRay = 360;
   }
-  if (randomAngle > 1.0f)
+  if (randomAngle > 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; randomAngle should be in the range 0 - 1. This will be limited to 1.", ERR_MSG_SIZE);
-    randomAngle = 1.0f;
+    randomAngle = 1.0F;
   }
-  if (sprayRay > 1.0f)
+  if (sprayRay > 1.0F)
   {
     wcsncpy_s(m_msg, L"post_process_hydra1; sprayRay should be in the range 0 - 1. This will be limited to 1.", ERR_MSG_SIZE);
-    sprayRay = 1.0f;
+    sprayRay = 1.0F;
   }
 
   if (w1 != w2 || h1 != h2 || w1 <= 0 || h1 <= 0)
@@ -199,14 +201,8 @@ bool PostProcessHydra1::Eval()
   // now run our internal implementation
   //
 
-  ExecutePostProcessHydra1(
-    input, output, numThreads, 
-    exposure, compress, contrast, 
-    saturation, whiteBalance, whitePointColor,
-    uniformContrast, normalize, vignette,
-    chromAberr, sharpness, sizeStar, 
-    numRay, rotateRay, randomAngle, 
-    sprayRay, w1, h1);
+  ExecutePostProcessHydra1( input, output, numThreads, exposure, compress, contrast, saturation, vibrance, whiteBalance, whitePointColor,
+    uniformContrast, normalize, vignette, chromAberr, sharpness, sizeStar, numRay, rotateRay, randomAngle, sprayRay, w1, h1);
 
   return true;
 }
@@ -215,14 +211,12 @@ bool PostProcessHydra1::Eval()
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void ExecutePostProcessHydra1(
+void ExecutePostProcessHydra1( 
   const float* a_input, float* a_output, unsigned int a_numThreads,
-  const float a_exposure, const float a_compress, const float a_contrast,
-  const float a_saturation, const float a_whiteBalance, float3 a_whitePointColor,
-  const float a_uniformContrast, const float a_normalize, const float a_vignette,
-  const float a_chromAberr, const float a_sharpness, const float a_sizeStar,
-  const int a_numRay, const int a_rotateRay, const float a_randomAngle, 
-  const float a_sprayRay, unsigned int a_width, unsigned int a_height)
+  const float a_exposure, const float a_compress, const float a_contrast, const float a_saturation, const float a_vibrance,
+  const float a_whiteBalance, float3 a_whitePointColor, const float a_uniformContrast, const float a_normalize, const float a_vignette,
+  const float a_chromAberr, const float a_sharpness, const float a_sizeStar, const int a_numRay, const int a_rotateRay,
+  const float a_randomAngle, const float a_sprayRay, unsigned int a_width, unsigned int a_height)
 { 
   // Set the desired number of threads
   const unsigned int maxThreads = omp_get_num_procs();
@@ -235,52 +229,51 @@ void ExecutePostProcessHydra1(
 
 
   // variables and constants
-  const int sizeImage = a_width * a_height;
-  const float centerImageX = a_width / 2.0f;
-  const float centerImageY = a_height / 2.0f;
-  const float diagonalImage = Distance(0, 0, (float)a_width, (float)a_height);
-  const float radiusImage = diagonalImage / 2.0f;
+  const int sizeImage       = a_width * a_height;
+  const float centerImageX  = (float)a_width / 2.0F;
+  const float centerImageY  = (float)a_height / 2.0F;
+  const float diagonalImage = Distance(0.0F, 0.0F, (float)a_width, (float)a_height);
+  const float radiusImage   = diagonalImage / 2.0F;
 
-  const int histogramBin = 10000;
+  const int histogramBin    = 10000;
 
   bool autoWhiteBalance = true;
-  if (a_whitePointColor.x > 0.0f || a_whitePointColor.y > 0.0f || a_whitePointColor.z > 0.0f)
-  {
+  if (a_whitePointColor.x > 0.0F || a_whitePointColor.y > 0.0F || a_whitePointColor.z > 0.0F)
     autoWhiteBalance = false;
-  }
-  float3 summRgb = { 0.0f, 0.0f, 0.0f };
-  float3 d65 = { 0.9505f , 1.0f, 1.0888f }; // in XYZ
 
-  float  minRgbSource = 10000.0f;
-  float  maxRgbSource = 0.0f;
+  float3 summRgb      = { 0.0F, 0.0F, 0.0F };
+  float3 d65          = { 0.9505F , 1.0F, 1.0888F }; // in XYZ
 
-  float  minAllHistBin = 0.0f;
-  float  maxAllHistBin = 1.0f;
-  float3 minHistBin(0.0f, 0.0f, 0.0f);
+  float  minRgbSource = 10000.0F;
+  float  maxRgbSource = 0.0F;
+
+  float  minAllHistBin = 0.0F;
+  float  maxAllHistBin = 1.0F;
+  float3 minHistBin(0.0F, 0.0F, 0.0F);
   float3 maxHistBin(histogramBin, histogramBin, histogramBin);
 
   // arrays
-  float* chromAbberR = nullptr;
-  float* chromAbberG = nullptr;
-  float* lumForSharp = nullptr;
-  float3* diffrStars = nullptr;
-  float3* histogram = nullptr;
+  std::vector<float> chromAbberR;
+  std::vector<float> chromAbberG;
+  std::vector<float> lumForSharp;
+  std::vector<float3> diffrStars;
+  std::vector<float3> histogram;
 
 
-  if (a_chromAberr > 0.0f)
+  if (a_chromAberr > 0.0F)
   {
-    chromAbberR = new float[sizeImage]; 
-    chromAbberG = new float[sizeImage]; 
+    chromAbberR.resize(sizeImage); 
+    chromAbberG.resize(sizeImage); 
   }
 
-  if (a_normalize > 0.0f)
-    histogram = new float3[histogramBin]; 
+  if (a_normalize > 0.0F)
+    histogram.resize(histogramBin);
 
-  if (a_sharpness > 0.0f)
-    lumForSharp = new float[sizeImage];
+  if (a_sharpness > 0.0F)
+    lumForSharp.resize(sizeImage);
 
-  if (a_sizeStar > 0.0f)
-    diffrStars = new float3[sizeImage];
+  if (a_sizeStar > 0.0F)
+    diffrStars.resize(sizeImage);
 
 
   //////////////////////////////////////////////////////////////////////////////////////
@@ -297,14 +290,14 @@ void ExecutePostProcessHydra1(
       image4out[i] = image4in[i];  
 
       // ----- Sharpness -----
-      if (a_sharpness > 0.0f)
+      if (a_sharpness > 0.0F)
       {
-        lumForSharp[i] = (image4out[i].x + image4out[i].y + image4out[i].z) / 3.0f;
-        lumForSharp[i] /= (1.0f + lumForSharp[i]);
+        lumForSharp[i] = (image4out[i].x + image4out[i].y + image4out[i].z) / 3.0F;
+        lumForSharp[i] /= (1.0F + lumForSharp[i]);
       }
 
       // ----- Exposure -----
-      if (a_exposure != 1.0f)
+      if (a_exposure != 1.0F)
       {
         image4out[i].x *= a_exposure;
         image4out[i].y *= a_exposure;
@@ -312,32 +305,32 @@ void ExecutePostProcessHydra1(
       }
 
       // Minimum, maximum, negative number clamp and NaN.
-      MinMaxRgb(image4out, minRgbSource, maxRgbSource, 0.0f, i);
+      MinMaxRgb(image4out, minRgbSource, maxRgbSource, 0.0F, i);
 
       // Collect all the brightness values by channel.
-      if (a_whiteBalance > 0.0f && autoWhiteBalance && image4out[i].x < 1.0f && image4out[i].y < 1.0f && image4out[i].z < 1.0f)
+      if (a_whiteBalance > 0.0F && autoWhiteBalance && image4out[i].x < 1.0F && image4out[i].y < 1.0F && image4out[i].z < 1.0F)
         SummValueOnField(image4out, &summRgb, i);
       
 
       // ----- Vignette -----
-      if (a_vignette > 0.0f)      
-        Vignette(image4out, a_width, a_height, a_vignette, diagonalImage, centerImageX, centerImageY, radiusImage, x, y, i);
+      if (a_vignette > 0.0F)      
+        Vignette(image4out, a_vignette, centerImageX, centerImageY, radiusImage, x, y, i);
       
 
       // ----- Difraction stars -----
-      if (a_sizeStar > 0.0f && image4out[i].x > 50.0f || image4out[i].y > 50.0f || image4out[i].z > 50.0f)      
-        DiffractionStars(image4out, diffrStars, a_sizeStar, a_numRay, a_rotateRay, a_randomAngle, a_sprayRay, a_width, a_height, sizeImage, radiusImage, x, y, i);
+      if (a_sizeStar > 0.0F && image4out[i].x > 50.0F || image4out[i].y > 50.0F || image4out[i].z > 50.0F)      
+        DiffractionStars(image4out, &diffrStars[0], a_sizeStar, a_numRay, a_rotateRay, a_randomAngle, a_sprayRay, a_width, a_height, sizeImage, radiusImage, x, y, i);
       
 
       // ----- Chromatic aberration -----
-      if (a_chromAberr > 0.0f)
-        ChrommAberr(image4out, chromAbberR, chromAbberG, a_width, a_height, sizeImage, a_chromAberr, x, y, i);      
+      if (a_chromAberr > 0.0F)
+        ChrommAberr(image4out, &chromAbberR[0], &chromAbberG[0], a_width, a_height, sizeImage, a_chromAberr, x, y, i);      
     }
   }
 
 
   // ----- Chromatic aberration -----
-  if (a_chromAberr > 0.0f)
+  if (a_chromAberr > 0.0F)
   {
     #pragma omp parallel for
     for (int i = 0; i < sizeImage; ++i)
@@ -349,29 +342,13 @@ void ExecutePostProcessHydra1(
 
 
   // ----- Sharpness -----
-  if (a_sharpness > 0.0f)
-    Sharp(image4out, lumForSharp, a_sharpness, a_width, a_height);
+  if (a_sharpness > 0.0F)
+    Sharp(image4out, &lumForSharp[0], a_sharpness, a_width, a_height);
 
 
   // ----- White point for white balance -----
-  if (a_whiteBalance > 0.0f)
-  {
-    if (autoWhiteBalance)
-      ComputeWhitePoint(summRgb, &a_whitePointColor, sizeImage);
-
-    ConvertSrgbToXyz(&a_whitePointColor);
-    MatrixCat02(&a_whitePointColor);
-    MatrixCat02(&d65);
-
-    const float lum = Luminance(a_whitePointColor);
-
-    if (lum > 0.0f)
-    {
-      a_whitePointColor.x /= lum;
-      a_whitePointColor.y /= lum;
-      a_whitePointColor.z /= lum;
-    }
-  }
+  if (a_whiteBalance > 0.0F)
+    GetWhitePointForWhiteBalance(autoWhiteBalance, summRgb, a_whitePointColor, sizeImage, d65);
 
   
   // ---------- Many filters Loop 2. ----------
@@ -379,7 +356,7 @@ void ExecutePostProcessHydra1(
   for (int i = 0; i < sizeImage; ++i)
   {
     // ----- Diffraction stars -----
-    if (a_sizeStar > 0.0f)
+    if (a_sizeStar > 0.0F)
     {
       image4out[i].x += diffrStars[i].x;
       image4out[i].y += diffrStars[i].y;
@@ -387,119 +364,43 @@ void ExecutePostProcessHydra1(
     }
 
     // ----- White balance -----
-    if (a_whiteBalance > 0.0f)
-    {
-      ConvertSrgbToXyz(&image4out[i]);
-      ChromAdaptIcam(&image4out[i], a_whitePointColor, d65, a_whiteBalance);
-      ConvertXyzToSrgb(&image4out[i]);
+    if (a_whiteBalance > 0.0F)
+      WhiteBalance(image4out[i], a_whitePointColor, d65, a_whiteBalance);
 
-      ClampMinusToZero(&image4out[i]);
-    }
 
-    // ----- Saturation  -----
-    if (a_saturation != 1.0f)
-    {
-      const float lum = Luminance(image4out[i]);
+    // ----- Saturation -----
+    if (a_saturation != 1.0F)
+      Saturation(image4out[i], a_saturation);
 
-      // Return to main array
-      image4out[i].x = lum + (image4out[i].x - lum) * a_saturation;
-      image4out[i].y = lum + (image4out[i].y - lum) * a_saturation;
-      image4out[i].z = lum + (image4out[i].z - lum) * a_saturation;
 
-      ClampMinusToZero(image4out, i);
-    }
+    // ----- Vibrance -----
+    if (a_vibrance != 1.0F)
+      Vibrance(image4out[i], a_vibrance);
+
 
     // ----- Compress -----
-    if (a_compress > 0.0f && maxRgbSource > 1.01f)
-    {
-      //Global LMS/IPT compress.
-      float knee = 10.0f;
-      Blend(knee, 2.0f, pow(a_compress, 0.175f)); // lower = softer
-      const float antiKnee = 1.0f / knee;
-
-      ConvertSrgbToXyz(&image4out[i]);
-      ConvertXyzToLmsPower(&image4out[i], 0.43f);
-      ConvertLmsToIpt(&image4out[i]);
-
-      const float compLum = image4out[i].x / pow((1.0f + pow(image4out[i].x, knee)), antiKnee);
-      const float multSat = pow(compLum / image4out[i].x, 1.5f);
-      image4out[i].x = compLum;
-      image4out[i].y *= multSat;
-      image4out[i].z *= multSat;
-
-      ConvertIptToLms(&image4out[i]);
-      ConvertLmsToXyzPower(&image4out[i]);
-      ConvertXyzToSrgb(&image4out[i]);
-    }
+    if (a_compress > 0.0F && maxRgbSource > 1.0F)
+      CompressIPT(image4out[i], a_compress);
 
 
     // ----- Contrast -----
-    if (a_contrast > 1.0f)
-    {
-      //RGB
-      float4 contrRGB = image4out[i];
-      contrRGB.x = pow(contrRGB.x, 1.0f / 2.2f);
-      contrRGB.y = pow(contrRGB.y, 1.0f / 2.2f);
-      contrRGB.z = pow(contrRGB.z, 1.0f / 2.2f);
-      ContrastField(contrRGB.x, a_contrast - 1.0f);
-      ContrastField(contrRGB.y, a_contrast - 1.0f);
-      ContrastField(contrRGB.z, a_contrast - 1.0f);
-      contrRGB.x = pow(contrRGB.x, 2.2f);
-      contrRGB.y = pow(contrRGB.y, 2.2f);
-      contrRGB.z = pow(contrRGB.z, 2.2f);
-
-      //IPT
-      ConvertSrgbToXyz(&image4out[i]);
-      ConvertXyzToLmsPower(&image4out[i], 0.43f);
-      ConvertLmsToIpt(&image4out[i]);
-
-      float lumContr = image4out[i].x;
-      ContrastField(lumContr, a_contrast - 1.0f);
-
-      const float multColor = 1.0f + abs(image4out[i].x - lumContr);
-      image4out[i].y *= multColor;
-      image4out[i].z *= multColor;
-      image4out[i].x = lumContr;
-
-      ConvertIptToLms(&image4out[i]);
-      ConvertLmsToXyzPower(&image4out[i]);
-      ConvertXyzToSrgb(&image4out[i]);
-
-      // Blend RGB and IPT 50x50%
-      Blend(image4out[i].x, contrRGB.x, 0.5f);
-      Blend(image4out[i].y, contrRGB.y, 0.5f);
-      Blend(image4out[i].z, contrRGB.z, 0.5f);
-    }
-  }
+    if (a_contrast > 1.0F)
+      Contrast(image4out[i], a_contrast);
+    
+  }// end loop 2.
   
 
   // ----- Uniform contrast. Loop 3 and 4. -----
-  if (a_uniformContrast > 0.0f)
-  {
+  if (a_uniformContrast > 0.0F)
     UniformContrastRGBFilter(&image4out[0], sizeImage, histogramBin, a_uniformContrast);
-  }
+
 
   // ----- Calculate histogram for normalize. Loop 5 and 6. -----
-  if (a_normalize > 0.0f)
+  if (a_normalize > 0.0F)
     NormalizeFilter(&image4out[0], &histogram[0], sizeImage, histogramBin, minHistBin, maxHistBin, minAllHistBin, maxAllHistBin, a_normalize);
 
 
   //********************* End filters *********************
-
-  if (a_chromAberr > 0.0f)
-  {
-    delete[] chromAbberR;
-    delete[] chromAbberG;
-  }
-
-  if (a_sharpness > 0.0f) 
-    delete[] lumForSharp;
-
-  if (a_sizeStar > 0.0f)  
-    delete[] diffrStars;
-      
-  if (a_normalize > 0.0f )
-    delete[] histogram;  
 }
 
 
