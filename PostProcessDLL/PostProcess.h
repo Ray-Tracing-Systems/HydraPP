@@ -849,143 +849,62 @@ void GetWhitePointForWhiteBalance(const bool a_autoWhiteBalance, const float3 a_
   }
 }
 
-void WhiteBalance(float4& a_data, const float3 a_whitePointColor, const float3 a_d65, const float a_whiteBalance)
+void WhiteBalance(float3& a_data, const float3 a_whitePointColor, const float3 a_d65, const float a_whiteBalance)
 {
-  float3 dataTemp(a_data.x, a_data.y, a_data.z);
-
-  ConvertSrgbToXyz(dataTemp);
-  ChromAdaptIcam  (dataTemp, a_whitePointColor, a_d65, a_whiteBalance);
-  ConvertXyzToSrgb(dataTemp);
-
-  a_data.x = dataTemp.x;
-  a_data.y = dataTemp.y;
-  a_data.z = dataTemp.z;
+  ConvertSrgbToXyz(a_data);
+  ChromAdaptIcam  (a_data, a_whitePointColor, a_d65, a_whiteBalance);
+  ConvertXyzToSrgb(a_data);
 }
 
 
-void Saturation(float4& a_data, const float a_saturation)
+void Saturation(float3& a_data, const float a_saturation)
 {
-  float3 dataTemp(a_data.x, a_data.y, a_data.z);
-
-  const float lum = Luminance(dataTemp);
-
-  dataTemp        = lum + (dataTemp - lum) * a_saturation;
-
-  ClampMinusToZero(dataTemp);
-
-  a_data.x = dataTemp.x;
-  a_data.y = dataTemp.y;
-  a_data.z = dataTemp.z;
+  const float lum = Luminance(a_data);
+  a_data          = lum + (a_data - lum) * a_saturation;
+  ClampMinusToZero(a_data);
 }
 
 
-void Vibrance(float4& a_data, const float a_vibrance) // saturation of unsaturated colors. 
+void VibranceIPT(float3& a_dataIPT, const float3 a_dataRGB, const float a_vibrance) // saturation of unsaturated colors. 
 {  
-  float3 dataTemp(a_data.x, a_data.y, a_data.z);
-
-  // IPT
-  float3 normColor = normalize(dataTemp);
-  ConvertSrgbToXyz(dataTemp);
-  ConvertXyzToLmsPower(dataTemp, 0.43F);
-  ConvertLmsToIpt(dataTemp);
-
-  ConvertSrgbToXyz(normColor);
+  float3 normColor     = normalize(a_dataRGB);
+  ConvertSrgbToXyz    (normColor);
   ConvertXyzToLmsPower(normColor, 0.43F);
-  ConvertLmsToIpt(normColor);
+  ConvertLmsToIpt     (normColor);
 
-  const float  satVal = sqrt(normColor.y * normColor.y + normColor.z * normColor.z);
+  const float  satVal  = sqrt(normColor.y * normColor.y + normColor.z * normColor.z) / 0.7852F; // 0.7852F - max sat. in normalize [0-1] IPT.
   const float  satMult = satVal + (1.0F - satVal) * a_vibrance;
 
-  dataTemp.y *= satMult;
-  dataTemp.z *= satMult;
-
-  ConvertIptToLms(dataTemp);
-  ConvertLmsToXyzPower(dataTemp);
-  ConvertXyzToSrgb(dataTemp);
-
-  ClampMinusToZero(dataTemp);
-
-  a_data.x = dataTemp.x;
-  a_data.y = dataTemp.y;
-  a_data.z = dataTemp.z;
+  a_dataIPT.y         *= satMult;
+  a_dataIPT.z         *= satMult;
 }
 
 
-void CompressIPT(float4& a_data, const float a_compress)
+void CompressIPT(float3& a_dataIPT, const float a_compress)
 {
-  float3 dataTemp(a_data.x, a_data.y, a_data.z);
-
-  // Global LMS/IPT compress.
+  // Global compress.
   float knee           = 10.0F;
   Blend(knee, 2.0F, pow(a_compress, 0.175F)); // lower = softer
   const float antiKnee = 1.0F / knee;
 
-  ConvertSrgbToXyz    (dataTemp);
-  ConvertXyzToLmsPower(dataTemp, 0.43F);
-  ConvertLmsToIpt     (dataTemp);
+  const float compLum  = a_dataIPT.x / pow((1.0F + pow(a_dataIPT.x, knee)), antiKnee);
+  const float multSat  = pow(compLum / fmax(a_dataIPT.x, 1e-6F), 1.5F);
 
-  const float compLum = dataTemp.x / pow((1.0F + pow(dataTemp.x, knee)), antiKnee);
-  const float multSat = pow(compLum / dataTemp.x, 1.5F);
-
-  dataTemp.x          = compLum;
-  dataTemp.y         *= multSat;
-  dataTemp.z         *= multSat;
-
-  ConvertIptToLms     (dataTemp);
-  ConvertLmsToXyzPower(dataTemp);
-  ConvertXyzToSrgb    (dataTemp);
-
-  ClampMinusToZero(dataTemp);
-
-  a_data.x = dataTemp.x;
-  a_data.y = dataTemp.y;
-  a_data.z = dataTemp.z;
+  a_dataIPT.x          = compLum;
+  a_dataIPT.y         *= multSat;
+  a_dataIPT.z         *= multSat;
 }
 
 
-void Contrast(float4& a_data, const float a_contrast)
+void ContrastIPT(float3& a_dataIPT, const float a_contrast)
 {
-  //RGB
-  float4 contrRGB = a_data;
-  contrRGB.x      = pow(contrRGB.x, 1.0F / 2.2F);
-  contrRGB.y      = pow(contrRGB.y, 1.0F / 2.2F);
-  contrRGB.z      = pow(contrRGB.z, 1.0F / 2.2F);
-  ContrastField(contrRGB.x, a_contrast - 1.0F);
-  ContrastField(contrRGB.y, a_contrast - 1.0F);
-  ContrastField(contrRGB.z, a_contrast - 1.0F);
-  contrRGB.x      = pow(contrRGB.x, 2.2F);
-  contrRGB.y      = pow(contrRGB.y, 2.2F);
-  contrRGB.z      = pow(contrRGB.z, 2.2F);
-
-  //IPT
-  float3 dataTemp(a_data.x, a_data.y, a_data.z);
-
-  ConvertSrgbToXyz    (dataTemp);
-  ConvertXyzToLmsPower(dataTemp, 0.43F);
-  ConvertLmsToIpt     (dataTemp);
-
-  float lumContr        = dataTemp.x;
+  float lumContr        = a_dataIPT.x;
   ContrastField(lumContr, a_contrast - 1.0F);
+  const float multColor = sqrt(lumContr / fmax(a_dataIPT.x, 1e-6F));
 
-  const float multColor = 1.0F + abs(dataTemp.x - lumContr);
-  dataTemp.y             *= multColor;
-  dataTemp.z             *= multColor;
-  dataTemp.x              = lumContr;
-
-  ConvertIptToLms     (dataTemp);
-  ConvertLmsToXyzPower(dataTemp);
-  ConvertXyzToSrgb    (dataTemp);
-
-  // Blend RGB and IPT 50x50%
-  Blend(dataTemp.x, contrRGB.x, 0.5F);
-  Blend(dataTemp.y, contrRGB.y, 0.5F);
-  Blend(dataTemp.z, contrRGB.z, 0.5F);
-
-  ClampMinusToZero(dataTemp);
-
-  a_data.x = dataTemp.x;
-  a_data.y = dataTemp.y;
-  a_data.z = dataTemp.z;
+  a_dataIPT.x           = lumContr;
+  //a_data.y           *= multColor;
+  a_dataIPT.z          *= multColor; // compress only blue-yellow axis for fix purple in blue spectrum.
 }
 
 
@@ -1569,14 +1488,14 @@ void UniformContrastRGBFilter(float4 image4out[], const int sizeImage, const int
 #pragma omp parallel for
   for (int i = 0; i < sizeImage; ++i)
   {
-    const float meanRGBsource = (image4out[i].x + image4out[i].y + image4out[i].z) / 3.0f;
-    const float meanRGB_UC = (rgbArray[i] + rgbArray[i + sizeImage] + rgbArray[i + sizeImage * 2]) / 3.0f;
+    const float meanRGBsource = (image4out[i].x + image4out[i].y + image4out[i].z) / 3.0F;
+    const float meanRGB_UC    = (rgbArray[i] + rgbArray[i + sizeImage] + rgbArray[i + sizeImage * 2]) / 3.0F;
 
-    float diff = meanRGB_UC / (meanRGBsource + 0.0001f);
+    float diff                = meanRGB_UC / fmax(meanRGBsource, 1e-6F);
     float3 rgbDiff;
-    rgbDiff.x = image4out[i].x;
-    rgbDiff.y = image4out[i].y;
-    rgbDiff.z = image4out[i].z;
+    rgbDiff.x                 = image4out[i].x;
+    rgbDiff.y                 = image4out[i].y;
+    rgbDiff.z                 = image4out[i].z;
 
     Blend(rgbDiff.x, image4out[i].x * diff, amount);
     Blend(rgbDiff.y, image4out[i].y * diff, amount);
@@ -1586,9 +1505,9 @@ void UniformContrastRGBFilter(float4 image4out[], const int sizeImage, const int
     Blend(image4out[i].y, rgbArray[i + sizeImage], amount);
     Blend(image4out[i].z, rgbArray[i + sizeImage * 2], amount);
 
-    Blend(image4out[i].x, rgbDiff.x, 0.5f);
-    Blend(image4out[i].y, rgbDiff.y, 0.5f);
-    Blend(image4out[i].z, rgbDiff.z, 0.5f);
+    Blend(image4out[i].x, rgbDiff.x, 0.5F);
+    Blend(image4out[i].y, rgbDiff.y, 0.5F);
+    Blend(image4out[i].z, rgbDiff.z, 0.5F);
   }
 }
 

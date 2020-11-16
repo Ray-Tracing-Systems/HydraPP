@@ -355,38 +355,59 @@ void ExecutePostProcessHydra1(
   #pragma omp parallel for
   for (int i = 0; i < sizeImage; ++i)
   {
+    float3 tempImg = float3(image4out[i].x, image4out[i].y, image4out[i].z);
+
     // ----- Diffraction stars -----
     if (a_sizeStar > 0.0F)
-    {
-      image4out[i].x += diffrStars[i].x;
-      image4out[i].y += diffrStars[i].y;
-      image4out[i].z += diffrStars[i].z;
-    }
+      tempImg += diffrStars[i];
+
 
     // ----- White balance -----
     if (a_whiteBalance > 0.0F)
-      WhiteBalance(image4out[i], a_whitePointColor, d65, a_whiteBalance);
+      WhiteBalance(tempImg, a_whitePointColor, d65, a_whiteBalance);
 
 
-    // ----- Saturation -----
+    // ----- Saturation  -----
     if (a_saturation != 1.0F)
-      Saturation(image4out[i], a_saturation);
+      Saturation(tempImg, a_saturation);
+
+
+    ////////// IPT block //////////
+
+    float3 tempImgIPT = tempImg;
+
+    ConvertSrgbToXyz    (tempImgIPT);
+    ConvertXyzToLmsPower(tempImgIPT, 0.43F);
+    ConvertLmsToIpt     (tempImgIPT);
 
 
     // ----- Vibrance -----
     if (a_vibrance != 1.0F)
-      Vibrance(image4out[i], a_vibrance);
+      VibranceIPT(tempImgIPT, tempImg, a_vibrance);
 
 
     // ----- Compress -----
     if (a_compress > 0.0F && maxRgbSource > 1.0F)
-      CompressIPT(image4out[i], a_compress);
+      CompressIPT(tempImgIPT, a_compress);
 
 
     // ----- Contrast -----
     if (a_contrast > 1.0F)
-      Contrast(image4out[i], a_contrast);
-    
+      ContrastIPT(tempImgIPT, a_contrast);
+
+
+    ConvertIptToLms     (tempImgIPT);
+    ConvertLmsToXyzPower(tempImgIPT);
+    ConvertXyzToSrgb    (tempImgIPT);
+
+    ////////// end IPT block //////////
+
+    ClampMinusToZero(tempImgIPT);
+
+    image4out[i].x = tempImgIPT.x;
+    image4out[i].y = tempImgIPT.y;
+    image4out[i].z = tempImgIPT.z;
+
   }// end loop 2.
   
 
