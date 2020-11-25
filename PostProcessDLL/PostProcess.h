@@ -469,24 +469,22 @@ void ConvertLmsToXyz(float3& a_data)
   a_data.z = 1.0893F * S;
 }
 
-void ConvertLmsToXyzPower(float3& a_data)
+void ConvertLmsToXyzPower(float3& a_data, const float a_power)
 {
   float L = a_data.x;
   float M = a_data.y;
-  float S = a_data.z;
+  float S = a_data.z;  
 
-  const float a = 1.0F / 0.43F;
-  
-  if      (L >= 0.0F) L =  pow( L, a);
-  else if (L <  0.0F) L = -pow(-L, a);
-  if      (M >= 0.0F) M =  pow( M, a);
-  else if (M <  0.0F) M = -pow(-M, a);
-  if      (S >= 0.0F) S =  pow( S, a);
-  else if (S <  0.0F) S = -pow(-S, a);
+  if      (L >= 0.0F) L =  pow( L, a_power);
+  else if (L <  0.0F) L = -pow(-L, a_power);
+  if      (M >= 0.0F) M =  pow( M, a_power);
+  else if (M <  0.0F) M = -pow(-M, a_power);
+  if      (S >= 0.0F) S =  pow( S, a_power);
+  else if (S <  0.0F) S = -pow(-S, a_power);
 
-  a_data.x = 1.8493F * L + -1.1383F * M +  0.2381F * S;
-  a_data.y = 0.3660F * L +  0.6444F * M + -0.0100F * S;
-  a_data.z = 1.0893F * S;
+  a_data.x = 1.8502F * L + -1.1383F * M +  0.2384F * S;
+  a_data.y = 0.3668F * L +  0.6438F * M + -0.0106F * S;
+  a_data.z = 1.0888F * S;
 }
 
 void ConvertIptToLms(float3& a_data)
@@ -642,15 +640,21 @@ void OffsetCenter(float& data, const float inMin, const float inMax, const float
   data = pow(data, coef);
   Normalize(data, 0, 1, inMin, inMax);
 }
-void ContrastField(float& data, const float amount)
+
+float ContrastField(const float a_data, const float a_amount)
 {
-  if (data > 0.0f && data < 1.0f)
+  float result = a_data;
+
+  if (a_data > 0.0F && a_data < 1.0F)
   {
-    const float a = data * 1.5707f;
+    const float a = a_data * 1.5707F;
     const float outData = sin(a) * sin(a);
-    Blend(data, outData, amount);
+    Blend(result, outData, a_amount);
   }
+
+  return result;
 }
+
 void Compress(float& data, const float maxRgb)
 {
   data = (data * (1.0f + data / (maxRgb * maxRgb))) / (1.0f + data);
@@ -883,28 +887,51 @@ void VibranceIPT(float3& a_dataIPT, const float3 a_dataRGB, const float a_vibran
 void CompressIPT(float3& a_dataIPT, const float a_compress)
 {
   // Global compress.
-  float knee           = 10.0F;
-  Blend(knee, 2.0F, pow(a_compress, 0.175F)); // lower = softer
+  float knee           = 5.0F;
+  Blend(knee, 2.0F, sqrt(a_compress)); // lower = softer
   const float antiKnee = 1.0F / knee;
 
   const float compLum  = a_dataIPT.x / pow((1.0F + pow(a_dataIPT.x, knee)), antiKnee);
-  const float multSat  = pow(compLum / fmax(a_dataIPT.x, 1e-6F), 1.5F);
+  const float diff     = pow(compLum / fmax(a_dataIPT.x, 1e-6F), 3.0F - a_compress * 2.0F);
 
   a_dataIPT.x          = compLum;
-  a_dataIPT.y         *= multSat;
-  a_dataIPT.z         *= multSat;
+  a_dataIPT.y         *= diff;
+  a_dataIPT.z         *= diff;
+
+  // more compress color
+
+  const float saturation = sqrt(a_dataIPT.y * a_dataIPT.y + a_dataIPT.z * a_dataIPT.z);
+  const float compSat    = tanh(saturation);
+  const float colorDiff  = compSat / fmax(saturation, 1e-6F);
+
+  a_dataIPT.x       *= sqrt(colorDiff);
+  a_dataIPT.y       *= colorDiff;
+  a_dataIPT.z       *= colorDiff;
 }
 
 
 void ContrastIPT(float3& a_dataIPT, const float a_contrast)
 {
-  float lumContr        = a_dataIPT.x;
-  ContrastField(lumContr, a_contrast - 1.0F);
-  const float multColor = sqrt(lumContr / fmax(a_dataIPT.x, 1e-6F));
+  const float lumContr    = ContrastField(a_dataIPT.x, a_contrast - 1.0F);
+  const float diff        = sqrt(lumContr / fmax(a_dataIPT.x, 1e-6F));
 
-  a_dataIPT.x           = lumContr;
-  //a_data.y           *= multColor;
-  a_dataIPT.z          *= multColor; // compress only blue-yellow axis for fix purple in blue spectrum.
+  const float multColor   = fmax(diff, 1e-6F);
+  const float multColBlue = diff < 1.0F ? diff : 1.0F / fmax(diff, 1e-6F); //we compress blue only when the brightness decreases, to prevent the appearance of purple.
+
+  a_dataIPT.x             = lumContr;
+  a_dataIPT.y            /= multColor;                // red-green
+  if (a_dataIPT.z < 0.0F) a_dataIPT.z *= multColBlue; // blue 
+  else                    a_dataIPT.z /= multColor;   // yellow
+
+  // more compress color
+
+  const float saturation  = sqrt(a_dataIPT.y * a_dataIPT.y + a_dataIPT.z * a_dataIPT.z);
+  const float compSat     = tanh(saturation);
+  const float colorDiff   = compSat / fmax(saturation, 1e-6F);
+
+  a_dataIPT.x            *= sqrt(colorDiff);
+  a_dataIPT.y            *= colorDiff;
+  a_dataIPT.z            *= colorDiff;
 }
 
 

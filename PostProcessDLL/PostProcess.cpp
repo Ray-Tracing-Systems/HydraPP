@@ -374,39 +374,43 @@ void ExecutePostProcessHydra1(
 
     ////////// IPT block //////////
 
-    float3 tempImgIPT = tempImg;
-
-    ConvertSrgbToXyz    (tempImgIPT);
-    ConvertXyzToLmsPower(tempImgIPT, 0.43F);
-    ConvertLmsToIpt     (tempImgIPT);
-
-
-    // ----- Vibrance -----
-    if (a_vibrance != 1.0F)
-      VibranceIPT(tempImgIPT, tempImg, a_vibrance);
+    if (a_vibrance != 1.0F || (a_compress > 0.0F && maxRgbSource > 1.0F) || a_contrast > 1.0F)
+    {
+      float3 tempImgIPT = tempImg;
+      ConvertSrgbToXyz    (tempImgIPT);
+      ConvertXyzToLmsPower(tempImgIPT, 0.43F);
+      ConvertLmsToIpt     (tempImgIPT);
 
 
-    // ----- Compress -----
-    if (a_compress > 0.0F && maxRgbSource > 1.0F)
-      CompressIPT(tempImgIPT, a_compress);
+      // ----- Vibrance -----
+      if (a_vibrance != 1.0F)
+        VibranceIPT(tempImgIPT, tempImg, a_vibrance);
 
 
-    // ----- Contrast -----
-    if (a_contrast > 1.0F)
-      ContrastIPT(tempImgIPT, a_contrast);
+      // ----- Compress -----
+      if (a_compress > 0.0F && maxRgbSource > 1.0F)
+        CompressIPT(tempImgIPT, a_compress);
 
 
-    ConvertIptToLms     (tempImgIPT);
-    ConvertLmsToXyzPower(tempImgIPT);
-    ConvertXyzToSrgb    (tempImgIPT);
+      // ----- Contrast -----        
+      if (a_contrast > 1.0F)
+        ContrastIPT(tempImgIPT, a_contrast);
 
-    ////////// end IPT block //////////
 
-    ClampMinusToZero(tempImgIPT);
+      ConvertIptToLms     (tempImgIPT);
+      ConvertLmsToXyzPower(tempImgIPT, 1.0F / 0.43F);
+      ConvertXyzToSrgb    (tempImgIPT);
 
-    image4out[i].x = tempImgIPT.x;
-    image4out[i].y = tempImgIPT.y;
-    image4out[i].z = tempImgIPT.z;
+      ////////// end IPT block //////////
+
+      ClampMinusToZero(tempImgIPT);
+
+      tempImg = tempImgIPT;
+    }
+
+    image4out[i].x = tempImg.x;
+    image4out[i].y = tempImg.y;
+    image4out[i].z = tempImg.z;
 
   }// end loop 2.
   
