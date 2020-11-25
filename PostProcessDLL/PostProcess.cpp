@@ -355,28 +355,28 @@ void ExecutePostProcessHydra1(
   #pragma omp parallel for
   for (int i = 0; i < sizeImage; ++i)
   {
-    float3 tempImg = float3(image4out[i].x, image4out[i].y, image4out[i].z);
+    float3 tempImgRGB = float3(image4out[i].x, image4out[i].y, image4out[i].z);
 
     // ----- Diffraction stars -----
     if (a_sizeStar > 0.0F)
-      tempImg += diffrStars[i];
+      tempImgRGB += diffrStars[i];
 
 
     // ----- White balance -----
     if (a_whiteBalance > 0.0F)
-      WhiteBalance(tempImg, a_whitePointColor, d65, a_whiteBalance);
+      WhiteBalance(tempImgRGB, a_whitePointColor, d65, a_whiteBalance);
 
 
     // ----- Saturation  -----
     if (a_saturation != 1.0F)
-      Saturation(tempImg, a_saturation);
+      Saturation(tempImgRGB, a_saturation);
 
 
     ////////// IPT block //////////
 
     if (a_vibrance != 1.0F || (a_compress > 0.0F && maxRgbSource > 1.0F) || a_contrast > 1.0F)
     {
-      float3 tempImgIPT = tempImg;
+      float3 tempImgIPT = tempImgRGB;
       ConvertSrgbToXyz    (tempImgIPT);
       ConvertXyzToLmsPower(tempImgIPT, 0.43F);
       ConvertLmsToIpt     (tempImgIPT);
@@ -384,7 +384,7 @@ void ExecutePostProcessHydra1(
 
       // ----- Vibrance -----
       if (a_vibrance != 1.0F)
-        VibranceIPT(tempImgIPT, tempImg, a_vibrance);
+        VibranceIPT(tempImgIPT, tempImgRGB, a_vibrance);
 
 
       // ----- Compress -----
@@ -405,12 +405,12 @@ void ExecutePostProcessHydra1(
 
       ClampMinusToZero(tempImgIPT);
 
-      tempImg = tempImgIPT;
+      tempImgRGB = tempImgIPT;
     }
 
-    image4out[i].x = tempImg.x;
-    image4out[i].y = tempImg.y;
-    image4out[i].z = tempImg.z;
+    image4out[i].x = tempImgRGB.x;
+    image4out[i].y = tempImgRGB.y;
+    image4out[i].z = tempImgRGB.z;
 
   }// end loop 2.
   

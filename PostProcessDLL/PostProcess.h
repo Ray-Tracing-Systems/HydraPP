@@ -876,7 +876,11 @@ void VibranceIPT(float3& a_dataIPT, const float3 a_dataRGB, const float a_vibran
   ConvertXyzToLmsPower(normColor, 0.43F);
   ConvertLmsToIpt     (normColor);
 
-  const float  satVal  = sqrt(normColor.y * normColor.y + normColor.z * normColor.z) / 0.7852F; // 0.7852F - max sat. in normalize [0-1] IPT.
+  const float  satVal  = sqrt(normColor.y * normColor.y + normColor.z * normColor.z) / 0.7852F; // 0.7852F - max sat. in normalize RGB [0-1] IPT.
+
+  if (satVal < 0.01F) // fix falloff some desaturated images to black.
+    return;
+
   const float  satMult = satVal + (1.0F - satVal) * a_vibrance;
 
   a_dataIPT.y         *= satMult;
