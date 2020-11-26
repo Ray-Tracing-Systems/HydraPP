@@ -417,7 +417,7 @@ void ExecutePostProcessHydra1(
 
   // ----- Uniform contrast. Loop 3 and 4. -----
   if (a_uniformContrast > 0.0F)
-    UniformContrastRGBFilter(&image4out[0], sizeImage, histogramBin, a_uniformContrast);
+    UniformContrastIPTFilter(&image4out[0], sizeImage, histogramBin, a_uniformContrast);
 
 
   // ----- Calculate histogram for normalize. Loop 5 and 6. -----
