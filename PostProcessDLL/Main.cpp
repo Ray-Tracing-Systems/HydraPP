@@ -1,4 +1,4 @@
-#include "PostProcess.h"
+#include "Functions.h"
 
 #include "../../HydraAPI/hydra_api/pugixml.hpp"
 #include "../../HydraAPI/hydra_api/HydraXMLHelpers.h"
@@ -211,25 +211,24 @@ bool PostProcessHydra1::Eval()
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void ExecutePostProcessHydra1( 
+void ExecutePostProcessHydra1(
   const float* a_input, float* a_output, unsigned int a_numThreads,
   const float a_exposure, const float a_compress, const float a_contrast, const float a_saturation, const float a_vibrance,
   const float a_whiteBalance, float3 a_whitePointColor, const float a_uniformContrast, const float a_normalize, const float a_vignette,
   const float a_chromAberr, const float a_sharpness, const float a_sizeStar, const int a_numRay, const int a_rotateRay,
   const float a_randomAngle, const float a_sprayRay, unsigned int a_width, unsigned int a_height)
-{ 
+{
   // Set the desired number of threads
   const unsigned int maxThreads = omp_get_num_procs();
   if (a_numThreads > maxThreads) a_numThreads = maxThreads;
   else if (a_numThreads <= 0)    a_numThreads = maxThreads;
   omp_set_num_threads(a_numThreads);
 
-  float4* image4in = (float4*)a_input;
-  float4* image4out = (float4*)a_output;
-
+  float4* image4in          = (float4*)a_input;
+  float4* image4out         = (float4*)a_output;
 
   // variables and constants
-  const int sizeImage       = a_width * a_height;
+  const int   sizeImage     = a_width * a_height;
   const float centerImageX  = (float)a_width / 2.0F;
   const float centerImageY  = (float)a_height / 2.0F;
   const float diagonalImage = Distance(0.0F, 0.0F, (float)a_width, (float)a_height);
@@ -241,14 +240,17 @@ void ExecutePostProcessHydra1(
   if (a_whitePointColor.x > 0.0F || a_whitePointColor.y > 0.0F || a_whitePointColor.z > 0.0F)
     autoWhiteBalance = false;
 
-  float3 summRgb      = { 0.0F, 0.0F, 0.0F };
-  float3 d65          = { 0.9505F , 1.0F, 1.0888F }; // in XYZ
+  float3 autoWhitePointRgb   = { 0.0F, 0.0F, 0.0F };
+  float3 summRgbColorPass    = { 0.0F, 0.0F, 0.0F };
+  float3 whitePointColorPass = { 1.0F, 1.0F, 1.0F };
+  float3 d65                 = { 0.9505F , 1.0F, 1.0888F }; // in XYZ
 
-  float  minRgbSource = 10000.0F;
-  float  maxRgbSource = 0.0F;
-
-  float  minAllHistBin = 0.0F;
-  float  maxAllHistBin = 1.0F;
+  float  minRgb              = 1e6F;
+  float  minRgb2             = 1e6F;
+  float  maxRgb              = 0.0F;
+  float  maxRgb2             = 0.0F;
+  float  minAllHistBin       = 0.0F;
+  float  maxAllHistBin       = 1.0F;
   float3 minHistBin(0.0F, 0.0F, 0.0F);
   float3 maxHistBin(histogramBin, histogramBin, histogramBin);
 
@@ -258,104 +260,135 @@ void ExecutePostProcessHydra1(
   std::vector<float> lumForSharp;
   std::vector<float3> diffrStars;
   std::vector<float3> histogram;
+  //std::vector<float> blurPassR;
+  //std::vector<float> blurPassG;
+  //std::vector<float> blurPassB;
 
 
   if (a_chromAberr > 0.0F)
   {
-    chromAbberR.resize(sizeImage); 
-    chromAbberG.resize(sizeImage); 
+    chromAbberR.resize(sizeImage);
+    chromAbberG.resize(sizeImage);
   }
-
   if (a_normalize > 0.0F)
     histogram.resize(histogramBin);
-
   if (a_sharpness > 0.0F)
     lumForSharp.resize(sizeImage);
-
   if (a_sizeStar > 0.0F)
     diffrStars.resize(sizeImage);
-
+  //if (a_compress > 0.0F || a_contrast > 1.0F || a_whiteBalance > 0.0F || a_diffuse > 0.0F)
+  //{
+  //  blurPassR.resize(sizeImage);
+  //  blurPassG.resize(sizeImage);
+  //  blurPassB.resize(sizeImage);
+  //}
 
   //////////////////////////////////////////////////////////////////////////////////////
 
 
-  // ----- Analization, precalculate and any effects. Loop 1. -----
-  //#pragma omp parallel for
+  // ----- Analization, precalculate and 3 effects. Loop 1. -----
+  //#pragma omp parallel for 
   for (int y = 0; y < a_height; ++y)
   {
     for (int x = 0; x < a_width; ++x)
     {
       const int i = y * a_width + x;
+      image4out[i] = image4in[i];
+      float3 tempImgRGB = float3(image4out[i].x, image4out[i].y, image4out[i].z);
 
-      image4out[i] = image4in[i];  
 
-      // ----- Sharpness -----
+      // ----- blur pass -----
+      //if (a_compress > 0.0F || a_contrast > 1.0F || a_whiteBalance > 0.0F || a_diffuse > 0.0F)
+      //{
+      //  blurPassR[i] = tempImgRGB.x;
+      //  blurPassG[i] = tempImgRGB.y;
+      //  blurPassB[i] = tempImgRGB.z;
+      //}
+
+
       if (a_sharpness > 0.0F)
       {
-        lumForSharp[i] = (image4out[i].x + image4out[i].y + image4out[i].z) / 3.0F;
+        lumForSharp[i] = (tempImgRGB.x + tempImgRGB.y + tempImgRGB.z) / 3.0F;
         lumForSharp[i] /= (1.0F + lumForSharp[i]);
       }
 
-      // ----- Exposure -----
+
       if (a_exposure != 1.0F)
-      {
-        image4out[i].x *= a_exposure;
-        image4out[i].y *= a_exposure;
-        image4out[i].z *= a_exposure;
-      }
+        tempImgRGB *= a_exposure;
 
-      // Minimum, maximum, negative number clamp and NaN.
-      MinMaxRgb(image4out, minRgbSource, maxRgbSource, 0.0F, i);
 
-      // Collect all the brightness values by channel.
-      if (a_whiteBalance > 0.0F && autoWhiteBalance && image4out[i].x < 1.0F && image4out[i].y < 1.0F && image4out[i].z < 1.0F)
-        SummValueOnField(image4out, &summRgb, i);
-      
+      ClampMinusToZero(tempImgRGB);
+      MinMaxRgb(tempImgRGB, minRgb, maxRgb);
 
-      // ----- Vignette -----
-      if (a_vignette > 0.0F)      
-        Vignette(image4out, a_vignette, centerImageX, centerImageY, radiusImage, x, y, i);
-      
 
-      // ----- Difraction stars -----
-      if (a_sizeStar > 0.0F && image4out[i].x > 50.0F || image4out[i].y > 50.0F || image4out[i].z > 50.0F)      
-        DiffractionStars(image4out, &diffrStars[0], a_sizeStar, a_numRay, a_rotateRay, a_randomAngle, a_sprayRay, a_width, a_height, sizeImage, radiusImage, x, y, i);
-      
+      if (a_whiteBalance > 0.0F && autoWhiteBalance)
+        CalculateAutoWhitePoint(tempImgRGB, autoWhitePointRgb);
 
-      // ----- Chromatic aberration -----
+
+      if (a_vignette > 0.0F)
+        Vignette(tempImgRGB, a_vignette, centerImageX, centerImageY, radiusImage, x, y);
+
+
+      if (a_sizeStar > 0.0F && (image4out[i].x > 50.0F || image4out[i].y > 50.0F || image4out[i].z > 50.0F))
+        DiffractionStars(tempImgRGB, diffrStars[0], a_sizeStar, a_numRay, a_rotateRay, a_randomAngle, a_sprayRay, a_width, a_height,
+          sizeImage, radiusImage, x, y, i);
+
+
       if (a_chromAberr > 0.0F)
-        ChrommAberr(image4out, &chromAbberR[0], &chromAbberG[0], a_width, a_height, sizeImage, a_chromAberr, x, y, i);      
+        ChrommAberr(tempImgRGB, &chromAbberR[0], &chromAbberG[0], a_width, a_height, sizeImage, a_chromAberr, x, y);
+
+
+      image4out[i].x = tempImgRGB.x;
+      image4out[i].y = tempImgRGB.y;
+      image4out[i].z = tempImgRGB.z;
     }
-  }
+  }// end loop 1.
 
 
   // ----- Chromatic aberration -----
   if (a_chromAberr > 0.0F)
   {
-    #pragma omp parallel for
-    for (int i = 0; i < sizeImage; ++i)
+#pragma omp parallel for 
+    for (int a = 0; a < sizeImage; ++a)
     {
-      image4out[i].x = chromAbberR[i];
-      image4out[i].y = chromAbberG[i];
+      image4out[a].x = chromAbberR[a];
+      image4out[a].y = chromAbberG[a];
     }
   }
-
 
   // ----- Sharpness -----
   if (a_sharpness > 0.0F)
     Sharp(image4out, &lumForSharp[0], a_sharpness, a_width, a_height);
 
 
+  // ----- Blur pass-----
+  //if (a_compress > 0.0F || a_contrast > 1.0F || a_whiteBalance > 0.0F)
+  //{
+  //  const int radius = (int)(radiusImage * 0.8F);
+  //    Blur(&blurPassR[0], radius, a_width, a_height, sizeImage);
+  //    Blur(&blurPassG[0], radius, a_width, a_height, sizeImage);
+  //    Blur(&blurPassB[0], radius, a_width, a_height, sizeImage);
+  //}
+
   // ----- White point for white balance -----
   if (a_whiteBalance > 0.0F)
-    GetWhitePointForWhiteBalance(autoWhiteBalance, summRgb, a_whitePointColor, sizeImage, d65);
+    GetWhitePointForWhiteBalance(autoWhiteBalance, autoWhitePointRgb, a_whitePointColor, sizeImage, d65);
 
-  
-  // ---------- Many filters Loop 2. ----------
-  #pragma omp parallel for
+
+  // ----- Many filters. Loop 2. -----
+#pragma omp parallel for
   for (int i = 0; i < sizeImage; ++i)
   {
-    float3 tempImgRGB = float3(image4out[i].x, image4out[i].y, image4out[i].z);
+    float3 tempImgRGB(image4out[i].x, image4out[i].y, image4out[i].z);
+
+    // ----- Diffuse -----
+    //if (a_diffuse > 0.0F)
+    //{
+    //  tempImgRGB.x = blurPassR[i];
+    //  tempImgRGB.y = blurPassG[i];
+    //  tempImgRGB.z = blurPassB[i];
+    //}
+
 
     // ----- Diffraction stars -----
     if (a_sizeStar > 0.0F)
@@ -374,22 +407,17 @@ void ExecutePostProcessHydra1(
 
     ////////// IPT block //////////
 
-    if (a_vibrance != 1.0F || (a_compress > 0.0F && maxRgbSource > 1.0F) || a_contrast > 1.0F)
+    if (a_vibrance != 1.0F || (a_compress > 0.0F && maxRgb > 1.0F) || a_contrast > 1.0F || a_uniformContrast > 0.0F)
     {
       float3 tempImgIPT = tempImgRGB;
-      ConvertSrgbToXyz    (tempImgIPT);
+      ConvertSrgbToXyz(tempImgIPT);
       ConvertXyzToLmsPower(tempImgIPT, 0.43F);
-      ConvertLmsToIpt     (tempImgIPT);
-
-
-      // ----- Vibrance -----
-      if (a_vibrance != 1.0F)
-        VibranceIPT(tempImgIPT, tempImgRGB, a_vibrance);
+      ConvertLmsToIpt(tempImgIPT);
 
 
       // ----- Compress -----
-      if (a_compress > 0.0F && maxRgbSource > 1.0F)
-        CompressIPT(tempImgIPT, a_compress);
+      if ((a_compress > 0.0F && maxRgb > 1.0F) || a_uniformContrast > 0.0F)
+        CompressIPT(tempImgIPT, fmax(a_compress, a_uniformContrast));
 
 
       // ----- Contrast -----        
@@ -397,37 +425,50 @@ void ExecutePostProcessHydra1(
         ContrastIPT(tempImgIPT, a_contrast);
 
 
-      ConvertIptToLms     (tempImgIPT);
+      // ----- Vibrance -----
+      if (a_vibrance != 1.0F)
+        VibranceIPT(tempImgIPT, tempImgRGB, a_vibrance);
+
+
+      ConvertIptToLms(tempImgIPT);
       ConvertLmsToXyzPower(tempImgIPT, 1.0F / 0.43F);
-      ConvertXyzToSrgb    (tempImgIPT);
+      ConvertXyzToSrgb(tempImgIPT);
 
       ////////// end IPT block //////////
 
-      ClampMinusToZero(tempImgIPT);
-
       tempImgRGB = tempImgIPT;
+
+      // little compress in RGB
+      if ((a_compress > 0.0F && maxRgb > 1.0F) || a_contrast > 1.0F || a_uniformContrast > 0.0F)
+      {
+        CompressWithKnee(tempImgRGB.x, 0.01F);
+        CompressWithKnee(tempImgRGB.y, 0.01F);
+        CompressWithKnee(tempImgRGB.z, 0.01F);
+      }
+
+      ClampMinusToZero(tempImgRGB);
     }
+
+    MinMaxRgb(tempImgRGB, minRgb2, maxRgb2);
 
     image4out[i].x = tempImgRGB.x;
     image4out[i].y = tempImgRGB.y;
     image4out[i].z = tempImgRGB.z;
+  } // end loop 2.
 
-  }// end loop 2.
-  
 
-  // ----- Uniform contrast. Loop 3 and 4. -----
-  if (a_uniformContrast > 0.0F)
+  if (maxRgb2 > 1e-3F) maxRgb = fmin(maxRgb, maxRgb2);
+
+
+  // ----- Uniform contrast. -----
+  if (a_uniformContrast > 0.0F && maxRgb > 0.01F)
     UniformContrastIPTFilter(&image4out[0], sizeImage, histogramBin, a_uniformContrast);
 
 
-  // ----- Calculate histogram for normalize. Loop 5 and 6. -----
+  // ----- Normalize. -----
   if (a_normalize > 0.0F)
     NormalizeFilter(&image4out[0], &histogram[0], sizeImage, histogramBin, minHistBin, maxHistBin, minAllHistBin, maxAllHistBin, a_normalize);
-
-
-  //********************* End filters *********************
 }
-
 
 
 

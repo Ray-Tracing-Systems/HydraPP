@@ -159,11 +159,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="PostProcess.cpp" />
+    <ClCompile Include="Functions.cpp" />
+    <ClCompile Include="Main.cpp" />
     <ClCompile Include="pp_dll_main_win.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PostProcess.h" />
+    <ClInclude Include="Functions.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\HydraAPI\hydra_api\HydraNewAPI1.vcxproj">
