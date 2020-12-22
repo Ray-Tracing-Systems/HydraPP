@@ -1013,7 +1013,7 @@ void CompressWithMax(float& data, const float maxRgb)
 void CompressWithKnee(float& a_data, const float a_compress)
 {
   float knee = 10.0F;
-  Blend(knee, 2.0F, pow(a_compress, 175.0F)); // lower = softer
+  Blend(knee, 2.0F, pow(a_compress, 0.175F)); // lower = softer
   const float antiKnee = 1.0F / knee;  
   
   a_data = a_data / pow((1.0F + pow(a_data, knee)), antiKnee);
