@@ -218,18 +218,18 @@ void ExecutePostProcessHydra1(
   const float a_chromAberr, const float a_sharpness, const float a_sizeStar, const int a_numRay, const int a_rotateRay,
   const float a_randomAngle, const float a_sprayRay, unsigned int a_width, unsigned int a_height)
 {
-  // Set the desired number of threads
-  const unsigned int maxThreads = omp_get_num_procs();
-  if (a_numThreads > maxThreads) a_numThreads = maxThreads;
-  else if (a_numThreads <= 0)    a_numThreads = maxThreads;
+  // Set the desired number of threads  
+  if (const unsigned int maxThreads = omp_get_num_procs(); a_numThreads > maxThreads) a_numThreads = maxThreads;
+  else if (a_numThreads <= 0)                                                         a_numThreads = maxThreads;
   omp_set_num_threads(a_numThreads);
 
-  float4* image4in          = (float4*)a_input;
-  float4* image4out         = (float4*)a_output;
+
+  auto const image4in       = (float4*)a_input;
+  auto const image4out      = (float4*)a_output;
 
   // variables and constants
-  const int   sizeImage     = a_width * a_height;
-  const float centerImageX  = (float)a_width / 2.0F;
+  const size_t sizeImage    = (size_t)a_width * (size_t)a_height;
+  const float centerImageX  = (float)a_width  / 2.0F;
   const float centerImageY  = (float)a_height / 2.0F;
   const float diagonalImage = Distance(0.0F, 0.0F, (float)a_width, (float)a_height);
   const float radiusImage   = diagonalImage / 2.0F;
@@ -288,12 +288,13 @@ void ExecutePostProcessHydra1(
 
   // ----- Analization, precalculate and 3 effects. Loop 1. -----
   //#pragma omp parallel for 
-  for (int y = 0; y < a_height; ++y)
+  for (size_t y = 0; y < (size_t)a_height; ++y)
   {
-    for (int x = 0; x < a_width; ++x)
+    for (size_t x = 0; x < (size_t)a_width; ++x)
     {
-      const int i = y * a_width + x;
-      image4out[i] = image4in[i];
+      const size_t i    = y * (size_t)a_width + x;
+
+      image4out[i]      = image4in[i];
       float3 tempImgRGB = float3(image4out[i].x, image4out[i].y, image4out[i].z);
 
 
@@ -313,7 +314,7 @@ void ExecutePostProcessHydra1(
       }
 
 
-      if (a_exposure != 1.0F)
+      if (fabs(a_exposure - 1.0F)> FLT_EPSILON)
         tempImgRGB *= a_exposure;
 
 
@@ -326,16 +327,16 @@ void ExecutePostProcessHydra1(
 
 
       if (a_vignette > 0.0F)
-        Vignette(tempImgRGB, a_vignette, centerImageX, centerImageY, radiusImage, x, y);
+        Vignette(tempImgRGB, a_vignette, centerImageX, centerImageY, radiusImage, (int)x, (int)y);
 
 
       if (a_sizeStar > 0.0F && (image4out[i].x > 50.0F || image4out[i].y > 50.0F || image4out[i].z > 50.0F))
         DiffractionStars(tempImgRGB, diffrStars[0], a_sizeStar, a_numRay, a_rotateRay, a_randomAngle, a_sprayRay, a_width, a_height,
-          sizeImage, radiusImage, x, y, i);
+          radiusImage, (int)x, (int)y);
 
 
       if (a_chromAberr > 0.0F)
-        ChrommAberr(tempImgRGB, &chromAbberR[0], &chromAbberG[0], a_width, a_height, sizeImage, a_chromAberr, x, y);
+        ChrommAberr(tempImgRGB, &chromAbberR[0], &chromAbberG[0], a_width, a_height, a_chromAberr, (int)x, (int)y);
 
 
       image4out[i].x = tempImgRGB.x;
@@ -349,16 +350,17 @@ void ExecutePostProcessHydra1(
   if (a_chromAberr > 0.0F)
   {
 #pragma omp parallel for 
-    for (int a = 0; a < sizeImage; ++a)
+    for (int a = 0; a < (int)sizeImage; ++a)
     {
-      image4out[a].x = chromAbberR[a];
-      image4out[a].y = chromAbberG[a];
+      const auto a2  = (size_t)a;
+      image4out[a2].x = chromAbberR[a2];
+      image4out[a2].y = chromAbberG[a2];
     }
   }
 
   // ----- Sharpness -----
   if (a_sharpness > 0.0F)
-    Sharp(image4out, &lumForSharp[0], a_sharpness, a_width, a_height);
+    Sharp(image4out, lumForSharp, a_sharpness, a_width, a_height);
 
 
   // ----- Blur pass-----
@@ -372,27 +374,29 @@ void ExecutePostProcessHydra1(
 
   // ----- White point for white balance -----
   if (a_whiteBalance > 0.0F)
-    GetWhitePointForWhiteBalance(autoWhiteBalance, autoWhitePointRgb, a_whitePointColor, sizeImage, d65);
+    GetWhitePointForWhiteBalance(autoWhiteBalance, autoWhitePointRgb, a_whitePointColor, (int)sizeImage, d65);
 
 
   // ----- Many filters. Loop 2. -----
 #pragma omp parallel for
-  for (int i = 0; i < sizeImage; ++i)
+  for (int i = 0; i < (int)sizeImage; ++i)
   {
-    float3 tempImgRGB(image4out[i].x, image4out[i].y, image4out[i].z);
+    const auto a = (size_t)i;
+
+    float3 tempImgRGB(image4out[a].x, image4out[a].y, image4out[a].z);
 
     // ----- Diffuse -----
     //if (a_diffuse > 0.0F)
     //{
-    //  tempImgRGB.x = blurPassR[i];
-    //  tempImgRGB.y = blurPassG[i];
-    //  tempImgRGB.z = blurPassB[i];
+    //  tempImgRGB.x = blurPassR[a];
+    //  tempImgRGB.y = blurPassG[a];
+    //  tempImgRGB.z = blurPassB[a];
     //}
 
 
     // ----- Diffraction stars -----
     if (a_sizeStar > 0.0F)
-      tempImgRGB += diffrStars[i];
+      tempImgRGB += diffrStars[a];
 
 
     // ----- White balance -----
@@ -401,13 +405,13 @@ void ExecutePostProcessHydra1(
 
 
     // ----- Saturation  -----
-    if (a_saturation != 1.0F)
+    if (fabs(a_saturation - 1.0F) > FLT_EPSILON)
       Saturation(tempImgRGB, a_saturation);
 
 
     ////////// IPT block //////////
 
-    if (a_vibrance != 1.0F || (a_compress > 0.0F && maxRgb > 1.0F) || a_contrast > 1.0F || a_uniformContrast > 0.0F)
+    if (fabs(a_vibrance - 1.0F) > FLT_EPSILON || (a_compress > 0.0F && maxRgb > 1.0F) || a_contrast > 1.0F || a_uniformContrast > 0.0F)
     {
       float3 tempImgIPT = tempImgRGB;
       ConvertSrgbToXyz(tempImgIPT);
@@ -426,7 +430,7 @@ void ExecutePostProcessHydra1(
 
 
       // ----- Vibrance -----
-      if (a_vibrance != 1.0F)
+      if (fabs(a_vibrance - 1.0F) > FLT_EPSILON)
         VibranceIPT(tempImgIPT, tempImgRGB, a_vibrance);
 
 
@@ -451,9 +455,9 @@ void ExecutePostProcessHydra1(
 
     MinMaxRgb(tempImgRGB, minRgb2, maxRgb2);
 
-    image4out[i].x = tempImgRGB.x;
-    image4out[i].y = tempImgRGB.y;
-    image4out[i].z = tempImgRGB.z;
+    image4out[a].x = tempImgRGB.x;
+    image4out[a].y = tempImgRGB.y;
+    image4out[a].z = tempImgRGB.z;
   } // end loop 2.
 
 
@@ -467,7 +471,7 @@ void ExecutePostProcessHydra1(
 
   // ----- Normalize. -----
   if (a_normalize > 0.0F)
-    NormalizeFilter(&image4out[0], &histogram[0], sizeImage, histogramBin, minHistBin, maxHistBin, minAllHistBin, maxAllHistBin, a_normalize);
+    NormalizeFilter(&image4out[0], histogram, sizeImage, histogramBin, minHistBin, maxHistBin, minAllHistBin, maxAllHistBin, a_normalize);
 }
 
 
