@@ -152,49 +152,49 @@ HRFBIRef hrFBICreateFromFile(const wchar_t* a_fileName, int a_desiredBpp, float 
   return resId;
 }
 
-void hrFBISaveToFile(HRFBIRef a_image, const wchar_t* a_fileName, float a_gamma)
-{
-  if (a_image.id >= g_fbImages.size() || a_image.id < 0)
-  {
-    HrPrint(HR_SEVERITY_ERROR, L"[hrFBISaveToFile]: bad image id = ", a_image.id);
-    return;
-  }
-
-  std::wstring inFileName(a_fileName);
-
-  auto& image = g_fbImages[a_image.id];
-
-  if (image.pHDRImage != nullptr)
-  {
-    const float* fdata = image.pHDRImage->data();
-    
-    if (inFileName.find(L".image4f") != std::wstring::npos) //#TODO: check normal way check of file extension
-    {
-      std::ofstream fout;
-      hr_ofstream_open(fout, a_fileName);
-      
-      int wh[2] = { image.pHDRImage->width(), image.pHDRImage->height() };
-      fout.write((const char*)wh, sizeof(wh));
-      fout.write((const char*)fdata, wh[0]*wh[1]*sizeof(float));
-      fout.close();
-    }
-    else if (inFileName.find(L".hdr") != std::wstring::npos || inFileName.find(L".exr") != std::wstring::npos)
-      HydraRender::SaveHDRImageToFileHDR(inFileName, image.pHDRImage->width(), image.pHDRImage->height(), fdata);
-    else
-      HydraRender::SaveImageToFile(inFileName, *image.pHDRImage, a_gamma);
-
-  }
-  else if (image.pLDRImage != nullptr)
-  {
-    const unsigned int* idata = (const unsigned int*)image.pLDRImage->data();
-    HydraRender::SaveImageToFile(a_fileName, image.pLDRImage->width(), image.pLDRImage->height(), idata);
-  }
-  else
-  {
-    HrPrint(HR_SEVERITY_ERROR, L"[hrFBISaveToFile]: attempt to save empty ldf image, id = ", a_image.id);
-  }
-
-}
+//void hrFBISaveToFile(HRFBIRef a_image, const wchar_t* a_fileName, float a_gamma) Deprecated.
+//{
+//  if (a_image.id >= g_fbImages.size() || a_image.id < 0)
+//  {
+//    HrPrint(HR_SEVERITY_ERROR, L"[hrFBISaveToFile]: bad image id = ", a_image.id);
+//    return;
+//  }
+//
+//  std::wstring inFileName(a_fileName);
+//
+//  auto& image = g_fbImages[a_image.id];
+//
+//  if (image.pHDRImage != nullptr)
+//  {
+//    const float* fdata = image.pHDRImage->data();
+//    
+//    if (inFileName.find(L".image4f") != std::wstring::npos) //#TODO: check normal way check of file extension
+//    {
+//      std::ofstream fout;
+//      hr_ofstream_open(fout, a_fileName);
+//      
+//      int wh[2] = { image.pHDRImage->width(), image.pHDRImage->height() };
+//      fout.write((const char*)wh, sizeof(wh));
+//      fout.write((const char*)fdata, wh[0]*wh[1]*sizeof(float));
+//      fout.close();
+//    }
+//    else if (inFileName.find(L".hdr") != std::wstring::npos || inFileName.find(L".exr") != std::wstring::npos)
+//      HydraRender::SaveHDRImageToFileHDR(inFileName, image.pHDRImage->width(), image.pHDRImage->height(), 4, fdata);
+//    else
+//      HydraRender::SaveImageToFile(inFileName, *image.pHDRImage, a_gamma);
+//
+//  }
+//  else if (image.pLDRImage != nullptr)
+//  {
+//    const unsigned int* idata = (const unsigned int*)image.pLDRImage->data();
+//    HydraRender::SaveImageToFile(a_fileName, image.pLDRImage->width(), image.pLDRImage->height(), idata);
+//  }
+//  else
+//  {
+//    HrPrint(HR_SEVERITY_ERROR, L"[hrFBISaveToFile]: attempt to save empty ldf image, id = ", a_image.id);
+//  }
+//
+//}
 
 void hrFBILoadFromFile(HRFBIRef a_image, const wchar_t* a_fileName, int a_desiredBpp, float a_inputGamma) //#TODO: alot of work should be done here
 {
